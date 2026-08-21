@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: fleet_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: fleet_db
+      MYSQL_USER: fleet_user
+      MYSQL_PASSWORD: fleet_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "fleet_user", "-pfleet_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fleet_api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      API_PREFIX: api
+      DATABASE_URL: "mysql://fleet_user:fleet_password@mysql:3306/fleet_db"
+      JWT_ACCESS_SECRET: "fleet-docker-jwt-access-secret-key-32chars"
+      JWT_ACCESS_EXPIRATION: "15m"
+      JWT_REFRESH_SECRET: "fleet-docker-jwt-refresh-secret-key-32chars"
+      JWT_REFRESH_EXPIRATION: "7d"
+    ports:
+      - "3000:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
