@@ -251,6 +251,29 @@ export class PartnerNetworkService {
     });
   }
 
+  async listPartnerOffers(orgId: string, requestId?: string) {
+    const where: any = {};
+    if (requestId) {
+      where.requestId = requestId;
+    } else {
+      where.OR = [
+        { supplyingOrganizationId: orgId },
+        { request: { requestingOrganizationId: orgId } },
+      ];
+    }
+
+    return this.prisma.partnerOffer.findMany({
+      where,
+      include: {
+        vehicle: true,
+        supplyingOrg: {
+          select: { id: true, displayName: true, email: true, phone: true, logoUrl: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async submitPartnerOffer(orgId: string, requestId: string, dto: SubmitPartnerOfferDto) {
     const request = await this.prisma.partnerRequest.findUnique({
       where: { id: requestId },

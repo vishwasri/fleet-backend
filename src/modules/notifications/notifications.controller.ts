@@ -4,6 +4,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -37,6 +38,17 @@ export class NotificationsController {
     return this.notificationService.listNotifications(orgId, query, user.userId);
   }
 
+  @Get('unread-count')
+  @Roles(OrgRole.VIEWER)
+  @ApiOperation({ summary: 'Get unread notifications count for current user' })
+  async getUnreadCount(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const count = await this.notificationService.getUnreadCount(orgId, user.userId);
+    return { unreadCount: count };
+  }
+
   @Patch(':id/read')
   @Roles(OrgRole.VIEWER)
   @ApiOperation({ summary: 'Mark an individual notification as read' })
@@ -47,10 +59,30 @@ export class NotificationsController {
     return this.notificationService.markAsRead(orgId, id);
   }
 
+  @Put(':id/read')
+  @Roles(OrgRole.VIEWER)
+  @ApiOperation({ summary: 'Mark an individual notification as read (PUT alias)' })
+  async markReadPut(
+    @CurrentOrgId() orgId: string,
+    @Param('id') id: string,
+  ) {
+    return this.notificationService.markAsRead(orgId, id);
+  }
+
   @Post('read-all')
   @Roles(OrgRole.VIEWER)
   @ApiOperation({ summary: 'Mark all notifications as read for current user' })
   async markAllRead(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.notificationService.markAllAsRead(orgId, user.userId);
+  }
+
+  @Put('read-all')
+  @Roles(OrgRole.VIEWER)
+  @ApiOperation({ summary: 'Mark all notifications as read for current user (PUT alias)' })
+  async markAllReadPut(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {

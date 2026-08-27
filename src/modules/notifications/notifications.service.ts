@@ -91,6 +91,16 @@ export class NotificationService {
     });
   }
 
+  async getUnreadCount(orgId: string, userId?: string) {
+    return this.prisma.notification.count({
+      where: {
+        organizationId: orgId,
+        userId: userId ? { in: [userId, null as any] } : undefined,
+        readAt: null,
+      },
+    });
+  }
+
   // ----------------------------------------------------
   // AUTOMATED DAILY ALERT SCANNER
   // ----------------------------------------------------

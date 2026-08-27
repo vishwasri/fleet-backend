@@ -42,6 +42,13 @@ export class PartnerNetworkController {
     return this.partnerService.getConnectedPartners(orgId);
   }
 
+  @Get('directory')
+  @Roles(OrgRole.VIEWER)
+  @ApiOperation({ summary: 'List connected active B2B partners (directory alias)' })
+  async getPartnerDirectory(@CurrentOrgId() orgId: string) {
+    return this.partnerService.getConnectedPartners(orgId);
+  }
+
   @Get('partners/invitations')
   @Roles(OrgRole.VIEWER)
   @ApiOperation({ summary: 'List incoming partnership invitations' })
@@ -89,6 +96,16 @@ export class PartnerNetworkController {
     @Query('filter') filter: 'mine' | 'network' = 'network',
   ) {
     return this.partnerService.listPartnerRequests(orgId, filter);
+  }
+
+  @Get('offers')
+  @Roles(OrgRole.VIEWER)
+  @ApiOperation({ summary: 'List wholesale partner offers' })
+  async listOffers(
+    @CurrentOrgId() orgId: string,
+    @Query('requestId') requestId?: string,
+  ) {
+    return this.partnerService.listPartnerOffers(orgId, requestId);
   }
 
   @Post('requests/:id/offers')

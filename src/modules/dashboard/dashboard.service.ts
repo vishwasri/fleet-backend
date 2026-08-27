@@ -212,7 +212,7 @@ export class DashboardService {
           ...todayPartnerReturns.map((r) => ({
             type: 'PARTNER',
             partnerRentalId: r.id,
-            partnerName: r.requestingOrg?.displayName,
+            partnerName: pPartnerRental(r),
             phone: r.requestingOrg?.phone,
             vehicle: `${r.vehicle?.make} ${r.vehicle?.model} (${r.vehicle?.registrationNumber})`,
             time: r.returnDateTime,
@@ -241,4 +241,71 @@ export class DashboardService {
       },
     };
   }
+
+  async getDashboardSummary(orgId: string) {
+    const pulse = await this.getOperationalPulse(orgId);
+
+    const alerts = [
+      ...pulse.alerts.expiringInsurance.map((i) => ({
+        id: `ins-${i.id}`,
+        title: 'Insurance Expiring',
+        message: `Insurance for ${i.make} ${i.model} (${i.registrationNumber}) expires soon.`,
+        severity: 'warning',
+        time: i.insuranceExpiryDate ? new Date(i.insuranceExpiryDate).toISOString() : '',
+      })),
+      ...pulse.alerts.expiringRegistration.map((r) => ({
+        id: `reg-${r.id}`,
+        title: 'Registration Expiring',
+        message: `Registration for ${r.make} ${r.model} (${r.registrationNumber}) expires soon.`,
+        severity: 'warning',
+        time: r.registrationExpiryDate ? new Date(r.registrationExpiryDate).toISOString() : '',
+      })),
+      ...pulse.alerts.pendingMaintenance.map((m) => ({
+        id: `maint-${m.id}`,
+        title: 'Maintenance Due',
+        message: `Maintenance scheduled for ${m.vehicle?.make} ${m.vehicle?.model} (${m.vehicle?.registrationNumber}).`,
+        severity: 'info',
+        time: m.scheduledDate ? new Date(m.scheduledDate).toISOString() : '',
+      })),
+    ];
+
+    const todaySchedule = [
+      ...pulse.todayOperations.pickups.map((p: any) => ({
+        id: p.bookingId || p.partnerRentalId || '',
+        customerName: p.customerName || p.partnerName || 'Customer',
+        vehicleName: p.vehicle || '',
+        licensePlate: p.vehicle ? p.vehicle.split('(')[1]?.replace(')', '') || '' : '',
+        time: p.time ? new Date(p.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+        type: 'Pickup',
+        status: 'Confirmed',
+      })),
+      ...pulse.todayOperations.returns.map((r: any) => ({
+        id: r.bookingId || r.partnerRentalId || '',
+        customerName: r.customerName || r.partnerName || 'Customer',
+        vehicleName: r.vehicle || '',
+        licensePlate: r.vehicle ? r.vehicle.split('(')[1]?.replace(')', '') || '' : '',
+        time: r.time ? new Date(r.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+        type: 'Return',
+        status: 'Scheduled',
+      })),
+    ];
+
+    return {
+      availableVehicles: pulse.fleetSummary.availableVehicles,
+      activeRentals: pulse.fleetSummary.directRentals + pulse.fleetSummary.partnerRentals,
+      inMaintenance: pulse.fleetSummary.inMaintenance,
+      partnerRentals: pulse.fleetSummary.partnerRentals,
+      todayPickupsCount: pulse.todayOperations.directPickupsCount + pulse.todayOperations.partnerPickupsCount,
+      todayReturnsCount: pulse.todayOperations.directReturnsCount + pulse.todayOperations.partnerReturnsCount,
+      monthRevenue: pulse.monthlyFinancials.totalRevenue,
+      monthExpenses: pulse.monthlyFinancials.expenses,
+      outstandingPayments: pulse.outstandingBalances.totalOutstanding,
+      alerts,
+      todaySchedule,
+    };
+  }
+}
+
+function pPartnerRental(r: any) {
+  return r.requestingOrg?.displayName || 'Partner';
 }

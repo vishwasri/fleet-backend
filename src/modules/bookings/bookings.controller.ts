@@ -79,6 +79,30 @@ export class BookingsController {
     return this.bookingsService.update(orgId, id, dto, user.userId);
   }
 
+  @Put(':id/status')
+  @Roles(OrgRole.STAFF)
+  @ApiOperation({ summary: 'Update direct booking status' })
+  async updateStatusPut(
+    @CurrentOrgId() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateBookingDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.bookingsService.update(orgId, id, dto, user.userId);
+  }
+
+  @Patch(':id/status')
+  @Roles(OrgRole.STAFF)
+  @ApiOperation({ summary: 'Update direct booking status' })
+  async updateStatusPatch(
+    @CurrentOrgId() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateBookingDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.bookingsService.update(orgId, id, dto, user.userId);
+  }
+
   @Post(':id/pickup')
   @Roles(OrgRole.STAFF)
   @ApiOperation({ summary: 'Record customer pickup (mileage, fuel level) and set vehicle status' })

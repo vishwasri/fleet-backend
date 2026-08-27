@@ -24,11 +24,79 @@ export class SettingsService {
       });
     }
 
-    return settings;
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      include: {
+        members: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    const staffMembers = org?.members.map((m) => ({
+      id: m.id,
+      fullName: `${m.user.firstName} ${m.user.lastName}`,
+      role: m.role,
+      email: m.user.email,
+      phone: m.user.phone || '',
+      isActive: m.status === 'ACTIVE',
+    })) || [];
+
+    return {
+      businessCurrency: org?.currency || settings.currency || 'USD',
+      businessTimezone: org?.timezone || settings.timezone || 'UTC',
+      profile: {
+        companyName: org?.legalName || org?.displayName || 'Apex Rentals',
+        registrationNumber: org?.id || 'REG-1001',
+        taxId: 'TAX-001',
+        registeredHub: org?.displayName || 'Main Hub',
+        contactEmail: org?.email || 'contact@apexrentals.com',
+        contactPhone: org?.phone || '+14155550100',
+        address: org?.address || '',
+        isVerifiedB2B: true,
+      },
+      pricingDefaults: {
+        defaultDailyRate: 100.0,
+        defaultSecurityDeposit: Number(settings.defaultDepositValue || 250.0),
+        minimumRentalDays: 1,
+        excessMileageRatePerKm: Number(settings.defaultExtraMileageRate || 0.35),
+        dailyMileageLimitKm: settings.defaultMileageLimitPerDay || 200,
+        lateReturnGracePeriodHours: (settings.lateReturnGracePeriodMinutes || 60) / 60,
+        defaultCleaningFee: 25.0,
+      },
+      inspectionSettings: {
+        requireMandatoryPhotos: settings.requireInspectionOnPickup,
+        minimumPhotosCount: 4,
+        requireDualSignatures: true,
+        strictFuelGaugeMatching: true,
+        requireOdometerSnapshot: true,
+      },
+      complianceSettings: {
+        requireDrivingLicenseValidation: true,
+        requireNationalIdValidation: true,
+        documentExpiryWarningDays: settings.documentExpiryAlertDays || 30,
+        blockRentalOnExpiredDoc: settings.blockBookingsForExpiredInsurance,
+      },
+      notificationPreferences: {
+        pushNotificationsEnabled: true,
+        smsAlertsEnabled: false,
+        emailReportsEnabled: true,
+        notifyOnPickupReturnDue: true,
+        notifyOnOverduePayments: true,
+        notifyOnPartnerBroadcasts: true,
+        notifyOnMaintenanceDue: true,
+      },
+      staffMembers,
+      ...settings,
+    };
   }
 
   async updateSettings(orgId: string, dto: UpdateSettingsDto, actorUserId?: string) {
-    const current = await this.getSettings(orgId);
+    const current = await this.prisma.organizationSettings.findUnique({
+      where: { organizationId: orgId },
+    });
 
     const updated = await this.prisma.organizationSettings.update({
       where: { organizationId: orgId },

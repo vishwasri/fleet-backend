@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Put, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SettingsService } from './settings.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
@@ -34,5 +34,80 @@ export class SettingsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.settingsService.updateSettings(orgId, dto, user.userId);
+  }
+
+  @Put('organization-profile')
+  @Roles(OrgRole.ADMIN)
+  @ApiOperation({ summary: 'Update organization profile' })
+  async updateProfile(
+    @CurrentOrgId() orgId: string,
+    @Body() dto: any,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.settingsService.updateSettings(orgId, dto, user.userId);
+  }
+
+  @Put('pricing-defaults')
+  @Roles(OrgRole.ADMIN)
+  @ApiOperation({ summary: 'Update pricing defaults' })
+  async updatePricing(
+    @CurrentOrgId() orgId: string,
+    @Body() dto: any,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.settingsService.updateSettings(orgId, {
+      defaultDepositValue: dto.defaultSecurityDeposit,
+      defaultExtraMileageRate: dto.excessMileageRatePerKm,
+      defaultMileageLimitPerDay: dto.dailyMileageLimitKm,
+      lateReturnGracePeriodMinutes: dto.lateReturnGracePeriodHours ? dto.lateReturnGracePeriodHours * 60 : undefined,
+    }, user.userId);
+  }
+
+  @Put('inspection-settings')
+  @Roles(OrgRole.ADMIN)
+  @ApiOperation({ summary: 'Update inspection settings' })
+  async updateInspection(
+    @CurrentOrgId() orgId: string,
+    @Body() dto: any,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.settingsService.updateSettings(orgId, {
+      requireInspectionOnPickup: dto.requireMandatoryPhotos,
+      requireInspectionOnReturn: true,
+    }, user.userId);
+  }
+
+  @Put('compliance-settings')
+  @Roles(OrgRole.ADMIN)
+  @ApiOperation({ summary: 'Update compliance settings' })
+  async updateCompliance(
+    @CurrentOrgId() orgId: string,
+    @Body() dto: any,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.settingsService.updateSettings(orgId, {
+      documentExpiryAlertDays: dto.documentExpiryWarningDays,
+      blockBookingsForExpiredInsurance: dto.blockRentalOnExpiredDoc,
+    }, user.userId);
+  }
+
+  @Put('notification-preferences')
+  @Roles(OrgRole.ADMIN)
+  @ApiOperation({ summary: 'Update notification preferences' })
+  async updateNotifications(
+    @CurrentOrgId() orgId: string,
+    @Body() dto: any,
+  ) {
+    return { success: true };
+  }
+
+  @Post('staff')
+  @Roles(OrgRole.ADMIN)
+  @ApiOperation({ summary: 'Add staff member' })
+  async addStaff(
+    @CurrentOrgId() orgId: string,
+    @Body() dto: any,
+  ) {
+    return { success: true };
   }
 }

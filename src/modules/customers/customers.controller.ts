@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -62,6 +63,17 @@ export class CustomersController {
   @Roles(OrgRole.STAFF)
   @ApiOperation({ summary: 'Update customer contact info, license details, or notes' })
   async update(
+    @CurrentOrgId() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateCustomerProfileDto,
+  ) {
+    return this.customersService.update(orgId, id, dto);
+  }
+
+  @Put(':id')
+  @Roles(OrgRole.STAFF)
+  @ApiOperation({ summary: 'Update customer contact info (PUT)' })
+  async updatePut(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
     @Body() dto: UpdateCustomerProfileDto,

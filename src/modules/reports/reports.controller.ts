@@ -16,6 +16,30 @@ import { OrgRole } from '@prisma/client';
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
+  @Get('comprehensive')
+  @Roles(OrgRole.ADMIN)
+  @ApiOperation({ summary: 'Comprehensive fleet business performance report' })
+  async getComprehensive(
+    @CurrentOrgId() orgId: string,
+    @Query('period') period?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.getComprehensiveReport(
+      orgId,
+      period,
+      startDate ? new Date(startDate) : undefined,
+      endDate ? new Date(endDate) : undefined,
+    );
+  }
+
+  @Get('vehicle-yields')
+  @Roles(OrgRole.ADMIN)
+  @ApiOperation({ summary: 'Vehicle yield and ROI rankings' })
+  async getVehicleYields(@CurrentOrgId() orgId: string) {
+    return this.reportsService.getVehicleYields(orgId);
+  }
+
   @Get('revenue')
   @Roles(OrgRole.ADMIN)
   @ApiOperation({ summary: 'Revenue breakdown: Direct vs Partner B2B revenue and profit' })

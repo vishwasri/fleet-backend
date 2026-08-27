@@ -198,6 +198,86 @@ export class ReportsService {
     };
   }
 
+  async getVehicleYields(orgId: string) {
+    const util = await this.getFleetUtilization(orgId);
+    return util.vehicles.map((v) => ({
+      vehicleId: v.vehicleId,
+      vehicleName: `${v.make} ${v.model}`,
+      licensePlate: v.registrationNumber,
+      totalRevenue: v.totalRevenue,
+      totalExpenses: 0.0,
+      netProfit: v.totalRevenue,
+      profitMargin: 100.0,
+      rentalDays: v.totalRentedDays,
+      utilizationRate: v.utilizationPercent,
+    }));
+  }
+
+  async getComprehensiveReport(orgId: string, period = 'This Month', startDate?: Date, endDate?: Date) {
+    const now = new Date();
+    const start = startDate ? new Date(startDate) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = endDate ? new Date(endDate) : new Date();
+
+    const [rev, util, settlements] = await Promise.all([
+      this.getRevenueComparison(orgId, start, end),
+      this.getFleetUtilization(orgId, start, end),
+      this.getPartnerSettlements(orgId),
+    ]);
+
+    const profitMargin = rev.totalIncome > 0
+      ? Number(((rev.netProfit / rev.totalIncome) * 100).toFixed(1))
+      : 0;
+
+    const topYieldVehicles = util.vehicles.map((v) => ({
+      vehicleId: v.vehicleId,
+      vehicleName: `${v.make} ${v.model}`,
+      licensePlate: v.registrationNumber,
+      totalRevenue: v.totalRevenue,
+      totalExpenses: 0.0,
+      netProfit: v.totalRevenue,
+      profitMargin: 100.0,
+      rentalDays: v.totalRentedDays,
+      utilizationRate: v.utilizationPercent,
+    }));
+
+    return {
+      periodLabel: period,
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+      totalRevenue: rev.totalIncome,
+      totalExpenses: rev.totalExpenses,
+      netProfit: rev.netProfit,
+      profitMargin,
+      revenueBreakdown: {
+        directRentalRevenue: rev.directRentalRevenue,
+        partnerWholesaleRevenue: rev.partnerRentalRevenue,
+        otherIncome: rev.otherIncome,
+        totalRevenue: rev.totalIncome,
+      },
+      utilizationReport: {
+        overallUtilizationRate: util.fleetSummary.overallFleetUtilizationPercent,
+        totalFleetCount: util.fleetSummary.totalVehicles,
+        activeRentalsCount: util.vehicles.filter((v) => v.totalRentedDays > 0).length,
+        availableVehiclesCount: util.vehicles.filter((v) => v.totalRentedDays === 0).length,
+        maintenanceVehiclesCount: 0,
+        partnerLoanedCount: util.vehicles.filter((v) => v.partnerRentalDays > 0).length,
+      },
+      outstandingReport: {
+        totalOutstandingCustomerBalances: 0.0,
+        totalOutstandingPartnerBalances: settlements.summary.totalReceivableFromPartners,
+        overdueAccountsCount: 0,
+        averageDaysToPay: 0.0,
+      },
+      settlementReport: {
+        totalSettledAmount: settlements.receivables.filter((r) => r.paymentStatus === 'PAID').reduce((sum, r) => sum + r.paidAmount, 0),
+        pendingSettlementAmount: settlements.summary.totalReceivableFromPartners,
+        completedSettlementsCount: settlements.receivables.filter((r) => r.paymentStatus === 'PAID').length,
+        pendingSettlementsCount: settlements.receivables.filter((r) => r.paymentStatus !== 'PAID').length,
+      },
+      topYieldVehicles,
+    };
+  }
+
   async getMarketplacePerformanceStub(orgId: string) {
     return {
       message: 'Version 2 Marketplace Reporting Foundation',

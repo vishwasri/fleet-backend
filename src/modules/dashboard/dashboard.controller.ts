@@ -16,6 +16,21 @@ import { OrgRole } from '@prisma/client';
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
+  @Get('summary')
+  @Roles(OrgRole.VIEWER)
+  @ApiOperation({ summary: 'Get mobile dashboard summary metrics, KPIs, today schedule, and alerts' })
+  async getDashboardSummary(@CurrentOrgId() orgId: string) {
+    return this.dashboardService.getDashboardSummary(orgId);
+  }
+
+  @Get('alerts')
+  @Roles(OrgRole.VIEWER)
+  @ApiOperation({ summary: 'Get dashboard alert notifications' })
+  async getDashboardAlerts(@CurrentOrgId() orgId: string) {
+    const summary = await this.dashboardService.getDashboardSummary(orgId);
+    return summary.alerts;
+  }
+
   @Get('pulse')
   @Roles(OrgRole.VIEWER)
   @ApiOperation({ summary: 'Get operational pulse: fleet stats, today pickups/returns, monthly revenue, balances & alerts' })

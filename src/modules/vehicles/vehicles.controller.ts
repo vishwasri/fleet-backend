@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -63,6 +64,39 @@ export class VehiclesController {
   @Roles(OrgRole.STAFF)
   @ApiOperation({ summary: 'Update vehicle information, rates, notes, or public marketplace listing fields' })
   async update(
+    @CurrentOrgId() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateVehicleDto,
+  ) {
+    return this.vehiclesService.update(orgId, id, dto);
+  }
+
+  @Put(':id')
+  @Roles(OrgRole.STAFF)
+  @ApiOperation({ summary: 'Update vehicle information (PUT)' })
+  async updatePut(
+    @CurrentOrgId() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateVehicleDto,
+  ) {
+    return this.vehiclesService.update(orgId, id, dto);
+  }
+
+  @Put(':id/availability')
+  @Roles(OrgRole.STAFF)
+  @ApiOperation({ summary: 'Update vehicle status/availability (PUT)' })
+  async updateAvailabilityPut(
+    @CurrentOrgId() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateVehicleDto,
+  ) {
+    return this.vehiclesService.update(orgId, id, dto);
+  }
+
+  @Patch(':id/availability')
+  @Roles(OrgRole.STAFF)
+  @ApiOperation({ summary: 'Update vehicle status/availability (PATCH)' })
+  async updateAvailabilityPatch(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
     @Body() dto: UpdateVehicleDto,
