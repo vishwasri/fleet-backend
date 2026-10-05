@@ -3,6 +3,11 @@ import { Type } from 'class-transformer';
 import { IsDate, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class SubmitPartnerOfferDto {
+  @ApiPropertyOptional({ description: 'Target Partner Request UUID' })
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
+
   @ApiProperty({ description: 'Vehicle UUID from supplier fleet to offer' })
   @IsUUID()
   vehicleId: string;

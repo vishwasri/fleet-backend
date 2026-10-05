@@ -119,6 +119,20 @@ export class PartnerNetworkController {
     return this.partnerService.submitPartnerOffer(orgId, requestId, dto);
   }
 
+  @Post('offers')
+  @Roles(OrgRole.STAFF)
+  @ApiOperation({ summary: 'Submit a wholesale offer with requestId in body' })
+  async submitOfferDirect(
+    @CurrentOrgId() orgId: string,
+    @Body() dto: SubmitPartnerOfferDto,
+  ) {
+    const targetRequestId = dto.requestId;
+    if (!targetRequestId) {
+      throw new Error('requestId is required in offer payload');
+    }
+    return this.partnerService.submitPartnerOffer(orgId, targetRequestId, dto);
+  }
+
   @Post('offers/:id/accept')
   @Roles(OrgRole.STAFF)
   @ApiOperation({ summary: 'Accept a partner offer and convert it into a confirmed B2B partner rental' })

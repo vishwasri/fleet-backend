@@ -89,9 +89,10 @@ export class CreateVehicleInspectionDto {
   @IsString()
   notes?: string;
 
-  @ApiProperty({ type: [InspectionItemResultDto] })
+  @ApiPropertyOptional({ type: [InspectionItemResultDto] })
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => InspectionItemResultDto)
-  items: InspectionItemResultDto[];
+  items?: InspectionItemResultDto[] = [];
 }

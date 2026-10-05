@@ -60,10 +60,10 @@ export class SettlePartnerRentalDto {
   @Min(0.01)
   amount: number;
 
-  @ApiProperty({ example: 'BANK_TRANSFER' })
+  @ApiPropertyOptional({ example: 'BANK_TRANSFER', default: 'BANK_TRANSFER' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  paymentMethod: string;
+  paymentMethod?: string = 'BANK_TRANSFER';
 
   @ApiPropertyOptional({ example: 'B2B-WIRE-2026-9988' })
   @IsOptional()

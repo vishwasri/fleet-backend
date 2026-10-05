@@ -1,6 +1,6 @@
 import { PartialType, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsDate, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsDate, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { CreateBookingDto } from './create-booking.dto';
 import { PaginationQueryDto } from '../../../common/dto/pagination.dto';
 import { BookingStatus, PaymentStatus } from '@prisma/client';
@@ -98,4 +98,10 @@ export class BookingQueryDto extends PaginationQueryDto {
   @Type(() => Date)
   @IsDate()
   endDate?: Date;
+
+  @ApiPropertyOptional({ description: 'Filter overdue active rentals past return date' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  isOverdue?: boolean;
 }

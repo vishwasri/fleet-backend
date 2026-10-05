@@ -98,14 +98,20 @@ export class SettingsService {
       where: { organizationId: orgId },
     });
 
-    const updated = await this.prisma.organizationSettings.update({
+    const updateData = {
+      ...dto,
+      defaultTaxRate: dto.defaultTaxRate !== undefined ? new Prisma.Decimal(dto.defaultTaxRate) : undefined,
+      defaultDepositValue: dto.defaultDepositValue !== undefined ? new Prisma.Decimal(dto.defaultDepositValue) : undefined,
+      defaultExtraMileageRate: dto.defaultExtraMileageRate !== undefined ? new Prisma.Decimal(dto.defaultExtraMileageRate) : undefined,
+      defaultLateReturnRate: dto.defaultLateReturnRate !== undefined ? new Prisma.Decimal(dto.defaultLateReturnRate) : undefined,
+    };
+
+    const updated = await this.prisma.organizationSettings.upsert({
       where: { organizationId: orgId },
-      data: {
-        ...dto,
-        defaultTaxRate: dto.defaultTaxRate !== undefined ? new Prisma.Decimal(dto.defaultTaxRate) : undefined,
-        defaultDepositValue: dto.defaultDepositValue !== undefined ? new Prisma.Decimal(dto.defaultDepositValue) : undefined,
-        defaultExtraMileageRate: dto.defaultExtraMileageRate !== undefined ? new Prisma.Decimal(dto.defaultExtraMileageRate) : undefined,
-        defaultLateReturnRate: dto.defaultLateReturnRate !== undefined ? new Prisma.Decimal(dto.defaultLateReturnRate) : undefined,
+      update: updateData,
+      create: {
+        organizationId: orgId,
+        ...updateData,
       },
     });
 

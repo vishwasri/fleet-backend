@@ -155,6 +155,15 @@ export class BookingsService {
       customerProfileId: query.customerProfileId,
     };
 
+    if (query.isOverdue) {
+      where.bookingStatus = {
+        in: [BookingStatus.CONFIRMED, BookingStatus.PICKED_UP, BookingStatus.ACTIVE],
+      };
+      where.returnDateTime = {
+        lt: new Date(),
+      };
+    }
+
     if (query.startDate || query.endDate) {
       where.pickupDateTime = {
         gte: query.startDate ? new Date(query.startDate) : undefined,
