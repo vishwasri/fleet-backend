@@ -1,12 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDate, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
-import { VehicleCategory } from '@prisma/client';
+import { IsDate, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreatePartnerRequestDto {
-  @ApiProperty({ enum: VehicleCategory, example: VehicleCategory.SUV })
-  @IsEnum(VehicleCategory)
-  vehicleCategory: VehicleCategory;
+  @ApiProperty({ example: 'SUV', description: 'Vehicle category (e.g. Bike, Tuk, Mini van, Hatchback, Sedan, SUV, etc.)' })
+  @IsString()
+  @IsNotEmpty()
+  vehicleCategory: string;
 
   @ApiProperty({ example: 75.0, description: 'Target wholesale daily budget rate' })
   @Type(() => Number)

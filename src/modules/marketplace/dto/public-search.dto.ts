@@ -2,18 +2,16 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsDate, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination.dto';
-import { VehicleCategory } from '@prisma/client';
-
 export class PublicVehicleSearchDto extends PaginationQueryDto {
   @ApiPropertyOptional({ example: 'Los Angeles' })
   @IsOptional()
   @IsString()
   city?: string;
 
-  @ApiPropertyOptional({ enum: VehicleCategory })
+  @ApiPropertyOptional({ description: 'Vehicle category (e.g. Bike, Tuk, Mini van, Hatchback, etc.)', example: 'Hatchback' })
   @IsOptional()
-  @IsEnum(VehicleCategory)
-  category?: VehicleCategory;
+  @IsString()
+  category?: string;
 
   @ApiPropertyOptional({ example: '2026-09-01T10:00:00.000Z' })
   @IsOptional()

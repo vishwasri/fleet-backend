@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDate, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
-import { VehicleCategory } from '@prisma/client';
+import { IsDate, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CheckVehicleAvailabilityDto {
   @ApiProperty({ description: 'Vehicle UUID' })
@@ -40,10 +39,10 @@ export class SearchAvailableVehiclesDto {
   @IsDate()
   returnDateTime: Date;
 
-  @ApiPropertyOptional({ enum: VehicleCategory })
+  @ApiPropertyOptional({ description: 'Vehicle category (e.g. Bike, Tuk, Mini van, Hatchback, etc.)', example: 'Hatchback' })
   @IsOptional()
-  @IsEnum(VehicleCategory)
-  category?: VehicleCategory;
+  @IsString()
+  category?: string;
 
   @ApiPropertyOptional({ description: 'Max daily rate' })
   @IsOptional()

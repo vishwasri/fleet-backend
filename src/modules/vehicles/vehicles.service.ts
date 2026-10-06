@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { VehicleQueryDto } from './dto/vehicle-query.dto';
+import { CreateVehicleCategoryDto, UpdateVehicleCategoryDto } from './dto/vehicle-category.dto';
 import Decimal from 'decimal.js';
 
 @Injectable()
@@ -25,6 +26,9 @@ export class VehiclesService {
         category: dto.category,
         dailyRate: new Prisma.Decimal(dto.dailyRate),
         partnerDailyRate: new Prisma.Decimal(dto.partnerDailyRate),
+        dailyMileageLimit: dto.dailyMileageLimit !== undefined ? dto.dailyMileageLimit : 100,
+        monthlyRate: dto.monthlyRate !== undefined && dto.monthlyRate !== null ? new Prisma.Decimal(dto.monthlyRate) : null,
+        monthlyMileageLimit: dto.monthlyMileageLimit !== undefined ? dto.monthlyMileageLimit : null,
         mileage: dto.mileage || 0,
         fuelType: dto.fuelType,
         transmission: dto.transmission,
@@ -38,6 +42,10 @@ export class VehiclesService {
         minimumRentalDays: dto.minimumRentalDays || 1,
         insuranceExpiryDate: dto.insuranceExpiryDate,
         registrationExpiryDate: dto.registrationExpiryDate,
+        hubLocation: dto.hubLocation,
+        branchLocationId: dto.branchLocationId,
+        rentalDurationType: dto.rentalDurationType || 'BOTH',
+        driverAvailability: dto.driverAvailability || 'BOTH',
         notes: dto.notes,
         privatePhotos: dto.privatePhotos ? JSON.stringify(dto.privatePhotos) : Prisma.JsonNull,
       },
@@ -114,6 +122,7 @@ export class VehiclesService {
       ...dto,
       dailyRate: dto.dailyRate !== undefined ? new Prisma.Decimal(dto.dailyRate) : undefined,
       partnerDailyRate: dto.partnerDailyRate !== undefined ? new Prisma.Decimal(dto.partnerDailyRate) : undefined,
+      monthlyRate: dto.monthlyRate !== undefined ? (dto.monthlyRate !== null ? new Prisma.Decimal(dto.monthlyRate) : null) : undefined,
       marketplaceDailyRate: dto.marketplaceDailyRate !== undefined ? new Prisma.Decimal(dto.marketplaceDailyRate) : undefined,
       publicPhotos: dto.publicPhotos ? JSON.stringify(dto.publicPhotos) : undefined,
       privatePhotos: dto.privatePhotos ? JSON.stringify(dto.privatePhotos) : undefined,
@@ -238,4 +247,124 @@ export class VehiclesService {
       },
     };
   }
+
+  async getMakesAndModels() {
+    return this.prisma.vehicleMake.findMany({
+      include: {
+        models: {
+          orderBy: { name: 'asc' },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async getCategories(includeInactive = false) {
+    return this.prisma.vehicleCategory.findMany({
+      where: includeInactive ? undefined : { isActive: true },
+      orderBy: [
+        { displayOrder: 'asc' },
+        { name: 'asc' },
+      ],
+    });
+  }
+
+  async createCategory(dto: CreateVehicleCategoryDto) {
+    const slug = dto.slug?.trim() || dto.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    
+    const existing = await this.prisma.vehicleCategory.findFirst({
+      where: {
+        OR: [
+          { name: { equals: dto.name } },
+          { slug: { equals: slug } },
+        ],
+      },
+    });
+
+    if (existing) {
+      throw new BadRequestException(`Vehicle category with name '${dto.name}' or slug '${slug}' already exists`);
+    }
+
+    return this.prisma.vehicleCategory.create({
+      data: {
+        name: dto.name.trim(),
+        slug,
+        description: dto.description?.trim(),
+        icon: dto.icon?.trim(),
+        displayOrder: dto.displayOrder ?? 0,
+        isActive: dto.isActive !== undefined ? dto.isActive : true,
+      },
+    });
+  }
+
+  async updateCategory(id: string, dto: UpdateVehicleCategoryDto) {
+    const existing = await this.prisma.vehicleCategory.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Vehicle category with ID ${id} not found`);
+    }
+
+    let slug = dto.slug?.trim();
+    if (!slug && dto.name && dto.name !== existing.name) {
+      slug = dto.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    }
+
+    if (dto.name || slug) {
+      const conflict = await this.prisma.vehicleCategory.findFirst({
+        where: {
+          id: { not: id },
+          OR: [
+            dto.name ? { name: { equals: dto.name.trim() } } : undefined,
+            slug ? { slug: { equals: slug } } : undefined,
+          ].filter(Boolean) as Prisma.VehicleCategoryWhereInput[],
+        },
+      });
+
+      if (conflict) {
+        throw new BadRequestException(`Another vehicle category with this name or slug already exists`);
+      }
+    }
+
+    return this.prisma.vehicleCategory.update({
+      where: { id },
+      data: {
+        name: dto.name?.trim(),
+        slug,
+        description: dto.description !== undefined ? dto.description?.trim() : undefined,
+        icon: dto.icon !== undefined ? dto.icon?.trim() : undefined,
+        displayOrder: dto.displayOrder,
+        isActive: dto.isActive,
+      },
+    });
+  }
+
+  async deleteCategory(id: string) {
+    const existing = await this.prisma.vehicleCategory.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Vehicle category with ID ${id} not found`);
+    }
+
+    // Check if any vehicles currently use this category name
+    const vehiclesCount = await this.prisma.vehicle.count({
+      where: { category: existing.name },
+    });
+
+    if (vehiclesCount > 0) {
+      // Soft-delete by setting inactive
+      return this.prisma.vehicleCategory.update({
+        where: { id },
+        data: { isActive: false },
+      });
+    }
+
+    return this.prisma.vehicleCategory.delete({
+      where: { id },
+    });
+  }
 }
+

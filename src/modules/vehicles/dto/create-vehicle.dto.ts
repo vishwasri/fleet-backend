@@ -15,7 +15,6 @@ import {
   FuelType,
   PublicListingStatus,
   TransmissionType,
-  VehicleCategory,
   VehicleStatus,
 } from '@prisma/client';
 
@@ -41,9 +40,10 @@ export class CreateVehicleDto {
   @Min(1990)
   year: number;
 
-  @ApiProperty({ enum: VehicleCategory, example: VehicleCategory.SEDAN })
-  @IsEnum(VehicleCategory)
-  category: VehicleCategory;
+  @ApiProperty({ example: 'Hatchback', description: 'Vehicle category (e.g. Bike, Tuk, Mini van, Hatchback, Sedan, SUV, etc.)' })
+  @IsString()
+  @IsNotEmpty()
+  category: string;
 
   @ApiProperty({ example: 120.0 })
   @Type(() => Number)
@@ -56,6 +56,27 @@ export class CreateVehicleDto {
   @IsNumber()
   @Min(0)
   partnerDailyRate: number;
+
+  @ApiPropertyOptional({ example: 100, default: 100, description: 'Available included mileage per day in km' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  dailyMileageLimit?: number;
+
+  @ApiPropertyOptional({ example: 250000.0, description: 'Monthly rental rate for long-term leases' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  monthlyRate?: number;
+
+  @ApiPropertyOptional({ example: 3000, default: 3000, description: 'Available included mileage per month in km' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  monthlyMileageLimit?: number;
 
   @ApiPropertyOptional({ example: 15000, default: 0 })
   @IsOptional()
@@ -129,6 +150,26 @@ export class CreateVehicleDto {
   @Type(() => Date)
   @IsDate()
   registrationExpiryDate?: Date;
+
+  @ApiPropertyOptional({ example: 'BOTH', description: 'Availability: SHORT_TERM, LONG_TERM, or BOTH' })
+  @IsOptional()
+  @IsString()
+  rentalDurationType?: string = 'BOTH';
+
+  @ApiPropertyOptional({ example: 'BOTH', description: 'Driver option: WITH_DRIVER, WITHOUT_DRIVER, or BOTH' })
+  @IsOptional()
+  @IsString()
+  driverAvailability?: string = 'BOTH';
+
+  @ApiPropertyOptional({ example: 'Colombo Fort Central Depot' })
+  @IsOptional()
+  @IsString()
+  hubLocation?: string;
+
+  @ApiPropertyOptional({ example: 'loc-fort' })
+  @IsOptional()
+  @IsString()
+  branchLocationId?: string;
 
   @ApiPropertyOptional({ example: 'Private notes: purchased in March 2024, dashcam installed' })
   @IsOptional()

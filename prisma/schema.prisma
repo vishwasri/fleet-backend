@@ -46,18 +46,6 @@ enum MarketplaceStatus {
   SUSPENDED
 }
 
-enum VehicleCategory {
-  SEDAN
-  SUV
-  HATCHBACK
-  COUPE
-  CONVERTIBLE
-  VAN
-  TRUCK
-  LUXURY
-  ELECTRIC
-  OTHER
-}
 
 enum FuelType {
   PETROL
@@ -416,6 +404,7 @@ model Organization {
   messageLogs           MessageLog[]
   marketplaceListings   MarketplaceListing[]
   searchLocations       MarketplaceSearchLocation[]
+  branchLocations       BranchLocation[]
   reviews               Review[]
 
   @@map("organizations")
@@ -486,7 +475,7 @@ model Vehicle {
   make                   String
   model                  String
   year                   Int
-  category               VehicleCategory
+  category               String
   dailyRate              Decimal             @db.Decimal(10, 2)
   partnerDailyRate       Decimal             @db.Decimal(10, 2)
   mileage                Int                 @default(0)
@@ -503,11 +492,19 @@ model Vehicle {
   insuranceExpiryDate    DateTime?
   registrationExpiryDate DateTime?
   notes                  String?             @db.Text
+  hubLocation            String?
+  branchLocationId       String?
+  rentalDurationType     String              @default("BOTH") // SHORT_TERM, LONG_TERM, BOTH
+  driverAvailability     String              @default("BOTH") // WITH_DRIVER, WITHOUT_DRIVER, BOTH
+  dailyMileageLimit      Int?                @default(100)
+  monthlyRate            Decimal?            @db.Decimal(10, 2)
+  monthlyMileageLimit    Int?                @default(3000)
   privatePhotos          Json?
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
 
   organization           Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchLocation         BranchLocation?     @relation(fields: [branchLocationId], references: [id], onDelete: SetNull)
   bookings               Booking[]
   maintenanceRecords     MaintenanceRecord[]
   vehicleBlocks          VehicleBlock[]
@@ -520,9 +517,29 @@ model Vehicle {
   inspections            VehicleInspection[]
 
   @@index([organizationId])
+  @@index([branchLocationId])
   @@index([status])
   @@index([publicListingStatus])
   @@map("vehicles")
+}
+
+model BranchLocation {
+  id             String        @id @default(uuid())
+  organizationId String
+  name           String
+  code           String?
+  address        String?       @db.Text
+  city           String?
+  isAirportHub   Boolean       @default(false)
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicles       Vehicle[]
+
+  @@index([organizationId])
+  @@map("branch_locations")
 }
 
 model VehicleDocument {
@@ -548,6 +565,48 @@ model VehicleDocument {
   @@index([documentType])
   @@index([expiryDate])
   @@map("vehicle_documents")
+}
+
+model VehicleMake {
+  id        String         @id @default(uuid())
+  name      String         @unique
+  logoUrl   String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  models    VehicleModel[]
+
+  @@map("vehicle_makes")
+}
+
+model VehicleModel {
+  id           String       @id @default(uuid())
+  makeId       String
+  name         String
+  category     String?
+  defaultSeats Int?         @default(5)
+  defaultFuel  String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  make         VehicleMake  @relation(fields: [makeId], references: [id], onDelete: Cascade)
+
+  @@unique([makeId, name])
+  @@index([makeId])
+  @@map("vehicle_models")
+}
+
+model VehicleCategory {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  slug         String   @unique
+  description  String?  @db.Text
+  icon         String?
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("vehicle_categories")
 }
 
 // ==========================================
@@ -903,7 +962,7 @@ model PartnerRelationship {
 model PartnerRequest {
   id                       String               @id @default(uuid())
   requestingOrganizationId String
-  vehicleCategory          VehicleCategory
+  vehicleCategory          String
   targetWholesaleRate      Decimal              @db.Decimal(10, 2)
   pickupDateTime           DateTime
   returnDateTime           DateTime

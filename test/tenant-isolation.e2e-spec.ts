@@ -6,7 +6,6 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
 import { TransformResponseInterceptor } from '../src/common/interceptors/transform-response.interceptor';
-import { VehicleCategory } from '@prisma/client';
 
 describe('Multi-Tenant Organization Isolation (e2e)', () => {
   let app: INestApplication;
@@ -61,7 +60,7 @@ describe('Multi-Tenant Organization Isolation (e2e)', () => {
           make: 'Audi',
           model: 'A6',
           year: 2024,
-          category: VehicleCategory.SEDAN,
+          category: 'Sedan',
           dailyRate: 110,
           partnerDailyRate: 80,
         });

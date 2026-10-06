@@ -5,7 +5,6 @@ import {
   OrgRole,
   MemberStatus,
   MarketplaceStatus,
-  VehicleCategory,
   FuelType,
   TransmissionType,
   VehicleStatus,
@@ -75,10 +74,34 @@ async function main() {
   await prisma.customerProfile.deleteMany();
   await prisma.marketplaceCustomerProfile.deleteMany();
   await prisma.vehicle.deleteMany();
+  await prisma.vehicleCategory.deleteMany();
   await prisma.organizationSettings.deleteMany();
   await prisma.organizationMember.deleteMany();
   await prisma.organization.deleteMany();
   await prisma.user.deleteMany();
+
+  // ==========================================
+  // 0. CREATE VEHICLE CATEGORIES (Dynamic DB)
+  // ==========================================
+  console.log('Creating vehicle categories in database...');
+  const defaultCategories = [
+    { name: 'Bike', slug: 'bike', description: 'Motorcycles, scooters, and 2-wheelers', icon: 'two_wheeler', displayOrder: 1 },
+    { name: 'Tuk', slug: 'tuk', description: 'Three-wheeler auto rickshaws', icon: 'electric_rickshaw', displayOrder: 2 },
+    { name: 'Mini van', slug: 'mini-van', description: 'Compact passenger & cargo mini vans', icon: 'airport_shuttle', displayOrder: 3 },
+    { name: 'Hatchback', slug: 'hatchback', description: 'Compact city hatchbacks', icon: 'directions_car', displayOrder: 4 },
+    { name: 'Sedan', slug: 'sedan', description: 'Standard 4-door passenger sedans', icon: 'directions_car', displayOrder: 5 },
+    { name: 'SUV', slug: 'suv', description: 'Sport utility vehicles & 4x4s', icon: 'directions_car', displayOrder: 6 },
+    { name: 'Luxury', slug: 'luxury', description: 'Premium executive & luxury cars', icon: 'star', displayOrder: 7 },
+    { name: 'Electric', slug: 'electric', description: 'All-electric zero-emission vehicles', icon: 'electric_car', displayOrder: 8 },
+    { name: 'Van', slug: 'van', description: 'Full-size passenger and cargo vans', icon: 'airport_shuttle', displayOrder: 9 },
+    { name: 'Sports', slug: 'sports', description: 'Sports cars & performance coupes', icon: 'sports_motorsports', displayOrder: 10 },
+  ];
+
+  for (const cat of defaultCategories) {
+    await prisma.vehicleCategory.create({
+      data: cat,
+    });
+  }
 
   const saltRounds = 10;
   const passwordHash = await bcrypt.hash('Fleet2026!Secure', saltRounds);
@@ -274,6 +297,41 @@ async function main() {
   });
 
   // ==========================================
+  // 3.5 CREATE BRANCH LOCATIONS & DEPOTS
+  // ==========================================
+  console.log('Creating branch locations and parking depots...');
+  const apexBranches = [
+    { name: 'Colombo Fort Central Depot', code: 'CMB-FORT', city: 'Colombo', address: 'No 45, Lotus Road, Colombo Fort', isAirportHub: false },
+    { name: 'BIA Airport Terminal 1 (Katunayake)', code: 'BIA-T1', city: 'Katunayake', address: 'Arrivals Terminal 1 Outer Ring, BIA', isAirportHub: true },
+    { name: 'BIA Airport Terminal 2 (Katunayake)', code: 'BIA-T2', city: 'Katunayake', address: 'Terminal 2 Commercial Bay, BIA', isAirportHub: true },
+    { name: 'Colombo City West (Bambalapitiya)', code: 'CMB-WEST', city: 'Colombo', address: '220 Galle Road, Bambalapitiya', isAirportHub: false },
+    { name: 'Kandy City Central Depot', code: 'KDY-CENTRAL', city: 'Kandy', address: '12 Dalada Veediya, Kandy', isAirportHub: false },
+  ];
+
+  for (const b of apexBranches) {
+    await prisma.branchLocation.create({
+      data: {
+        ...b,
+        organizationId: apexOrg.id,
+      },
+    });
+  }
+
+  const metroBranches = [
+    { name: 'Downtown LA Central Hub', code: 'DTLA-01', city: 'Los Angeles', address: '450 S Grand Ave, Los Angeles, CA', isAirportHub: false },
+    { name: 'LAX Airport Depot', code: 'LAX-DEPOT', city: 'Los Angeles', address: '9800 Airport Blvd, Los Angeles, CA', isAirportHub: true },
+  ];
+
+  for (const b of metroBranches) {
+    await prisma.branchLocation.create({
+      data: {
+        ...b,
+        organizationId: metroOrg.id,
+      },
+    });
+  }
+
+  // ==========================================
   // 4. CREATE VEHICLES & DOCUMENTS
   // ==========================================
   console.log('Creating fleet vehicles and compliance documents...');
@@ -288,7 +346,7 @@ async function main() {
       make: 'Tesla',
       model: 'Model Y Long Range',
       year: 2024,
-      category: VehicleCategory.SUV,
+      category: 'SUV',
       dailyRate: new Prisma.Decimal(125.0),
       partnerDailyRate: new Prisma.Decimal(90.0),
       marketplaceDailyRate: new Prisma.Decimal(135.0),
@@ -335,7 +393,7 @@ async function main() {
       make: 'BMW',
       model: 'M3 Competition',
       year: 2024,
-      category: VehicleCategory.LUXURY,
+      category: 'Luxury',
       dailyRate: new Prisma.Decimal(220.0),
       partnerDailyRate: new Prisma.Decimal(165.0),
       marketplaceDailyRate: new Prisma.Decimal(240.0),
@@ -372,7 +430,7 @@ async function main() {
       make: 'Toyota',
       model: 'Camry SE',
       year: 2023,
-      category: VehicleCategory.SEDAN,
+      category: 'Sedan',
       dailyRate: new Prisma.Decimal(65.0),
       partnerDailyRate: new Prisma.Decimal(45.0),
       mileage: 38000,
@@ -461,7 +519,7 @@ async function main() {
   const partnerReq = await prisma.partnerRequest.create({
     data: {
       requestingOrganizationId: apexOrg.id,
-      vehicleCategory: VehicleCategory.SEDAN,
+      vehicleCategory: 'Sedan',
       targetWholesaleRate: new Prisma.Decimal(50.0),
       pickupDateTime: new Date('2026-09-10T09:00:00.000Z'),
       returnDateTime: new Date('2026-09-14T09:00:00.000Z'),

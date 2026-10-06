@@ -15,10 +15,12 @@ import { VehiclesService } from './vehicles.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { VehicleQueryDto } from './dto/vehicle-query.dto';
+import { CreateVehicleCategoryDto, UpdateVehicleCategoryDto } from './dto/vehicle-category.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgTenantGuard } from '../../common/guards/org-tenant.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { CurrentOrgId } from '../../common/decorators/current-org.decorator';
 import { OrgRole } from '@prisma/client';
 
@@ -48,6 +50,44 @@ export class VehiclesController {
     @Query() query: VehicleQueryDto,
   ) {
     return this.vehiclesService.findAll(orgId, query);
+  }
+
+  @Public()
+  @Get('makes')
+  @ApiOperation({ summary: 'List known vehicle makes and models' })
+  async getMakes() {
+    return this.vehiclesService.getMakesAndModels();
+  }
+
+  @Public()
+  @Get('categories')
+  @ApiOperation({ summary: 'List all active vehicle categories from database' })
+  async getCategories() {
+    return this.vehiclesService.getCategories();
+  }
+
+  @Post('categories')
+  @Roles(OrgRole.ADMIN)
+  @ApiOperation({ summary: 'Add a new vehicle category (Backoffice Admin)' })
+  async createCategory(@Body() dto: CreateVehicleCategoryDto) {
+    return this.vehiclesService.createCategory(dto);
+  }
+
+  @Patch('categories/:id')
+  @Roles(OrgRole.ADMIN)
+  @ApiOperation({ summary: 'Update a vehicle category (Backoffice Admin)' })
+  async updateCategory(
+    @Param('id') id: string,
+    @Body() dto: UpdateVehicleCategoryDto,
+  ) {
+    return this.vehiclesService.updateCategory(id, dto);
+  }
+
+  @Delete('categories/:id')
+  @Roles(OrgRole.ADMIN)
+  @ApiOperation({ summary: 'Delete or deactivate a vehicle category (Backoffice Admin)' })
+  async deleteCategory(@Param('id') id: string) {
+    return this.vehiclesService.deleteCategory(id);
   }
 
   @Get(':id')

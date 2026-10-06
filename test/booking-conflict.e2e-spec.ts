@@ -6,7 +6,6 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
 import { TransformResponseInterceptor } from '../src/common/interceptors/transform-response.interceptor';
-import { VehicleCategory } from '@prisma/client';
 
 describe('Booking Conflict Prevention & Availability Engine (e2e)', () => {
   let app: INestApplication;
@@ -59,7 +58,7 @@ describe('Booking Conflict Prevention & Availability Engine (e2e)', () => {
           make: 'BMW',
           model: '330i',
           year: 2024,
-          category: VehicleCategory.SEDAN,
+          category: 'Sedan',
           dailyRate: 130,
           partnerDailyRate: 90,
         });

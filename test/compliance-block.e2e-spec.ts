@@ -6,7 +6,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
 import { TransformResponseInterceptor } from '../src/common/interceptors/transform-response.interceptor';
-import { DocumentType, VehicleCategory } from '@prisma/client';
+import { DocumentType } from '@prisma/client';
 
 describe('Compliance Blocking on Expired Vehicle Documents (e2e)', () => {
   let app: INestApplication;
@@ -68,7 +68,7 @@ describe('Compliance Blocking on Expired Vehicle Documents (e2e)', () => {
         make: 'Mercedes',
         model: 'C300',
         year: 2023,
-        category: VehicleCategory.SEDAN,
+        category: 'Sedan',
         dailyRate: 95.0,
         partnerDailyRate: 70.0,
       });

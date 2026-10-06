@@ -6,7 +6,6 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
 import { TransformResponseInterceptor } from '../src/common/interceptors/transform-response.interceptor';
-import { VehicleCategory } from '@prisma/client';
 
 describe('Operational Workflow: Inspections, Deposits, Extra Charges, Returns (e2e)', () => {
   let app: INestApplication;
@@ -60,7 +59,7 @@ describe('Operational Workflow: Inspections, Deposits, Extra Charges, Returns (e
         make: 'Audi',
         model: 'Q5',
         year: 2024,
-        category: VehicleCategory.SUV,
+        category: 'SUV',
         dailyRate: 110.0,
         partnerDailyRate: 85.0,
         mileage: 20000,

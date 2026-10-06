@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination.dto';
-import { VehicleCategory, VehicleStatus, PublicListingStatus } from '@prisma/client';
+import { VehicleStatus, PublicListingStatus } from '@prisma/client';
 
 export class VehicleQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ enum: VehicleStatus })
@@ -9,10 +9,10 @@ export class VehicleQueryDto extends PaginationQueryDto {
   @IsEnum(VehicleStatus)
   status?: VehicleStatus;
 
-  @ApiPropertyOptional({ enum: VehicleCategory })
+  @ApiPropertyOptional({ description: 'Filter by category (e.g. Bike, Tuk, Mini van, Hatchback, etc.)', example: 'Hatchback' })
   @IsOptional()
-  @IsEnum(VehicleCategory)
-  category?: VehicleCategory;
+  @IsString()
+  category?: string;
 
   @ApiPropertyOptional({ enum: PublicListingStatus })
   @IsOptional()

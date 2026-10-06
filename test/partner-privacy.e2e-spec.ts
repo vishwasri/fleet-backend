@@ -6,7 +6,6 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { PrismaExceptionFilter } from '../src/common/filters/prisma-exception.filter';
 import { TransformResponseInterceptor } from '../src/common/interceptors/transform-response.interceptor';
-import { VehicleCategory } from '@prisma/client';
 
 describe('Partner Network Privacy & Public Data Segregation (e2e)', () => {
   let app: INestApplication;
@@ -62,7 +61,7 @@ describe('Partner Network Privacy & Public Data Segregation (e2e)', () => {
           make: 'Cadillac',
           model: 'Escalade',
           year: 2024,
-          category: VehicleCategory.SUV,
+          category: 'SUV',
           dailyRate: 200,
           partnerDailyRate: 140,
           publicListingStatus: 'DRAFT',
@@ -123,7 +122,7 @@ describe('Partner Network Privacy & Public Data Segregation (e2e)', () => {
       .set('Authorization', `Bearer ${tokenRequester}`)
       .set('x-organization-id', requesterOrgId)
       .send({
-        vehicleCategory: VehicleCategory.SUV,
+        vehicleCategory: 'SUV',
         targetWholesaleRate: 140,
         pickupDateTime: new Date('2026-11-01T10:00:00.000Z'),
         returnDateTime: new Date('2026-11-05T10:00:00.000Z'),
