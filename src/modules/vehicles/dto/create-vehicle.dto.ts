@@ -64,6 +64,13 @@ export class CreateVehicleDto {
   @Min(0)
   dailyMileageLimit?: number;
 
+  @ApiPropertyOptional({ example: 85.0, default: 85.0, description: 'Excess mileage fee per extra km on daily rentals in LKR' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  dailyExcessMileageFee?: number;
+
   @ApiPropertyOptional({ example: 250000.0, description: 'Monthly rental rate for long-term leases' })
   @IsOptional()
   @Type(() => Number)
@@ -77,6 +84,20 @@ export class CreateVehicleDto {
   @IsInt()
   @Min(0)
   monthlyMileageLimit?: number;
+
+  @ApiPropertyOptional({ example: 75.0, default: 75.0, description: 'Excess mileage fee per extra km on monthly rentals in LKR' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  monthlyExcessMileageFee?: number;
+
+  @ApiPropertyOptional({ example: 50000.0, default: 50000.0, description: 'Security deposit in LKR' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  securityDeposit?: number;
 
   @ApiPropertyOptional({ example: 15000, default: 0 })
   @IsOptional()

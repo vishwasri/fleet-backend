@@ -494,14 +494,17 @@ model Vehicle {
   notes                  String?             @db.Text
   hubLocation            String?
   branchLocationId       String?
-  rentalDurationType     String              @default("BOTH") // SHORT_TERM, LONG_TERM, BOTH
-  driverAvailability     String              @default("BOTH") // WITH_DRIVER, WITHOUT_DRIVER, BOTH
-  dailyMileageLimit      Int?                @default(100)
-  monthlyRate            Decimal?            @db.Decimal(10, 2)
-  monthlyMileageLimit    Int?                @default(3000)
-  privatePhotos          Json?
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
+  rentalDurationType        String              @default("BOTH") // SHORT_TERM, LONG_TERM, BOTH
+  driverAvailability        String              @default("BOTH") // WITH_DRIVER, WITHOUT_DRIVER, BOTH
+  dailyMileageLimit         Int?                @default(100)
+  dailyExcessMileageFee     Decimal?            @default(85.00) @db.Decimal(10, 2)
+  monthlyRate               Decimal?            @db.Decimal(10, 2)
+  monthlyMileageLimit       Int?                @default(3000)
+  monthlyExcessMileageFee   Decimal?            @default(75.00) @db.Decimal(10, 2)
+  securityDeposit           Decimal?            @default(50000.00) @db.Decimal(10, 2)
+  privatePhotos             Json?
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
 
   organization           Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   branchLocation         BranchLocation?     @relation(fields: [branchLocationId], references: [id], onDelete: SetNull)
