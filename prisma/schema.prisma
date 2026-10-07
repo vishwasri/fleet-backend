@@ -479,6 +479,7 @@ model Vehicle {
   dailyRate              Decimal             @db.Decimal(10, 2)
   partnerDailyRate       Decimal             @db.Decimal(10, 2)
   mileage                Int                 @default(0)
+  color                  String?             @default("White")
   fuelType               FuelType            @default(PETROL)
   transmission           TransmissionType    @default(AUTOMATIC)
   seats                  Int                 @default(5)
@@ -625,7 +626,13 @@ model CustomerProfile {
   email                String
   address              String?      @db.Text
   drivingLicenceNumber String
+  nationalIdNumber     String?
   licenceExpiryDate    DateTime?
+  emergencyContact     String?
+  avatarUrl            String?
+  rating               Decimal?     @default(5.00) @db.Decimal(3, 2)
+  isBlacklisted        Boolean      @default(false)
+  blacklistReason      String?      @db.Text
   documents            Json?
   notes                String?      @db.Text
   createdAt            DateTime     @default(now())
@@ -638,6 +645,7 @@ model CustomerProfile {
   @@index([organizationId])
   @@index([phone])
   @@index([email])
+  @@index([isBlacklisted])
   @@map("customer_profiles")
 }
 

@@ -101,11 +101,48 @@ export class VehiclesService {
     const vehicle = await this.prisma.vehicle.findFirst({
       where: { id, organizationId: orgId },
       include: {
+        documents: {
+          where: { isArchived: false },
+          orderBy: { expiryDate: 'asc' },
+        },
+        maintenanceRecords: {
+          orderBy: { scheduledDate: 'desc' },
+        },
+        vehicleBlocks: {
+          orderBy: { startDateTime: 'asc' },
+        },
+        branchLocation: true,
+        bookings: {
+          select: {
+            id: true,
+            bookingNumber: true,
+            pickupDateTime: true,
+            returnDateTime: true,
+            totalAmount: true,
+            paidAmount: true,
+            bookingStatus: true,
+            paymentStatus: true,
+          },
+          orderBy: { pickupDateTime: 'desc' },
+        },
+        partnerRentals: {
+          select: {
+            id: true,
+            handoverDateTime: true,
+            returnDateTime: true,
+            totalAmount: true,
+            paidAmount: true,
+            status: true,
+          },
+          orderBy: { handoverDateTime: 'desc' },
+        },
         _count: {
           select: {
             bookings: true,
             partnerRentals: true,
             maintenanceRecords: true,
+            vehicleBlocks: true,
+            documents: true,
           },
         },
       },
@@ -115,11 +152,123 @@ export class VehiclesService {
       throw new NotFoundException(`Vehicle with ID ${id} not found in this organization`);
     }
 
-    return vehicle;
+    // Calculate total revenue generated from direct bookings & partner rentals
+    const bookingRevenue = vehicle.bookings.reduce((sum, b) => {
+      return sum + Number(b.paidAmount || b.totalAmount || 0);
+    }, 0);
+    const partnerRevenue = vehicle.partnerRentals.reduce((sum, pr) => {
+      return sum + Number(pr.paidAmount || pr.totalAmount || 0);
+    }, 0);
+    const totalRevenueGenerated = bookingRevenue + partnerRevenue;
+
+    // Documents list mapping
+    let documentsList = vehicle.documents.map(d => ({
+      id: d.id,
+      title: d.documentType.replace(/_/g, ' '),
+      documentType: d.documentType,
+      documentNumber: d.documentNumber || '',
+      expiryDate: d.expiryDate,
+      fileUrl: d.fileUrl || '',
+      status: d.status,
+      isExpired: d.expiryDate ? new Date(d.expiryDate) < new Date() : false,
+    }));
+
+    // If documents are empty but insuranceExpiryDate or registrationExpiryDate are set on vehicle, provide them
+    if (documentsList.length === 0) {
+      if (vehicle.insuranceExpiryDate) {
+        documentsList.push({
+          id: `doc_ins_${vehicle.id}`,
+          title: 'Comprehensive Insurance',
+          documentType: 'INSURANCE',
+          documentNumber: 'POL-AUTO-ACTIVE',
+          expiryDate: vehicle.insuranceExpiryDate,
+          fileUrl: '',
+          status: vehicle.insuranceExpiryDate < new Date() ? 'EXPIRED' : 'VALID',
+          isExpired: vehicle.insuranceExpiryDate < new Date(),
+        });
+      }
+      if (vehicle.registrationExpiryDate) {
+        documentsList.push({
+          id: `doc_reg_${vehicle.id}`,
+          title: 'Revenue License & Registration',
+          documentType: 'REGISTRATION',
+          documentNumber: vehicle.registrationNumber,
+          expiryDate: vehicle.registrationExpiryDate,
+          fileUrl: '',
+          status: vehicle.registrationExpiryDate < new Date() ? 'EXPIRED' : 'VALID',
+          isExpired: vehicle.registrationExpiryDate < new Date(),
+        });
+      }
+    }
+
+    // Maintenance records mapping
+    const maintenanceList = vehicle.maintenanceRecords.map(m => ({
+      id: m.id,
+      serviceType: m.title,
+      serviceDate: m.scheduledDate,
+      mileageAtService: vehicle.mileage,
+      cost: Number(m.cost),
+      workshop: m.description || 'Authorized Service Partner',
+      notes: m.notes || '',
+      status: m.status,
+    }));
+
+    // Combine upcoming bookings and blocks for calendar / timeline
+    const upcomingSchedule = [
+      ...vehicle.bookings.map(b => ({
+        id: b.id,
+        title: `Direct Booking #${b.bookingNumber}`,
+        type: 'BOOKING',
+        startDate: b.pickupDateTime,
+        endDate: b.returnDateTime,
+        status: b.bookingStatus,
+      })),
+      ...vehicle.partnerRentals.map(pr => ({
+        id: pr.id,
+        title: `Partner Loan #${pr.id.substring(0, 8)}`,
+        type: 'PARTNER_RENTAL',
+        startDate: pr.handoverDateTime,
+        endDate: pr.returnDateTime,
+        status: pr.status,
+      })),
+      ...vehicle.vehicleBlocks.map(vb => ({
+        id: vb.id,
+        title: `Block: ${vb.reason}`,
+        type: 'BLOCK',
+        startDate: vb.startDateTime,
+        endDate: vb.endDateTime,
+        status: 'ACTIVE',
+        notes: vb.notes,
+      })),
+    ].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+
+    return {
+      ...vehicle,
+      totalRevenueGenerated,
+      hubLocation: vehicle.branchLocation?.name || vehicle.hubLocation || 'Main Hub',
+      documents: documentsList,
+      maintenanceHistory: maintenanceList,
+      upcomingSchedule,
+      bookingsCount: vehicle._count.bookings + vehicle._count.partnerRentals,
+    };
   }
 
   async update(orgId: string, id: string, dto: UpdateVehicleDto) {
     await this.findOne(orgId, id);
+
+    let publicPhotosFormatted: string | undefined = undefined;
+    if (dto.publicPhotos !== undefined) {
+      publicPhotosFormatted = typeof dto.publicPhotos === 'string'
+        ? dto.publicPhotos
+        : JSON.stringify(dto.publicPhotos);
+    }
+
+    let privatePhotosFormatted: string | undefined = undefined;
+    if (dto.privatePhotos !== undefined) {
+      privatePhotosFormatted = typeof dto.privatePhotos === 'string'
+        ? dto.privatePhotos
+        : JSON.stringify(dto.privatePhotos);
+    }
 
     const data: Prisma.VehicleUpdateInput = {
       ...dto,
@@ -130,14 +279,16 @@ export class VehiclesService {
       monthlyExcessMileageFee: dto.monthlyExcessMileageFee !== undefined ? (dto.monthlyExcessMileageFee !== null ? new Prisma.Decimal(dto.monthlyExcessMileageFee) : null) : undefined,
       securityDeposit: dto.securityDeposit !== undefined ? (dto.securityDeposit !== null ? new Prisma.Decimal(dto.securityDeposit) : null) : undefined,
       marketplaceDailyRate: dto.marketplaceDailyRate !== undefined ? new Prisma.Decimal(dto.marketplaceDailyRate) : undefined,
-      publicPhotos: dto.publicPhotos ? JSON.stringify(dto.publicPhotos) : undefined,
-      privatePhotos: dto.privatePhotos ? JSON.stringify(dto.privatePhotos) : undefined,
+      publicPhotos: publicPhotosFormatted,
+      privatePhotos: privatePhotosFormatted,
     };
 
-    return this.prisma.vehicle.update({
+    await this.prisma.vehicle.update({
       where: { id },
       data,
     });
+
+    return this.findOne(orgId, id);
   }
 
   async remove(orgId: string, id: string) {

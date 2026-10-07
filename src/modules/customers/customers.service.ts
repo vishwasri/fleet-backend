@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCustomerProfileDto, UpdateCustomerProfileDto } from './dto/create-customer.dto';
@@ -9,20 +9,33 @@ export class CustomersService {
   constructor(private prisma: PrismaService) {}
 
   async create(orgId: string, dto: CreateCustomerProfileDto) {
-    return this.prisma.customerProfile.create({
+    let documentsJson: any = Prisma.JsonNull;
+    if (dto.documents !== undefined && dto.documents !== null) {
+      documentsJson = typeof dto.documents === 'string' ? JSON.parse(dto.documents) : dto.documents;
+    }
+
+    const created = await this.prisma.customerProfile.create({
       data: {
         organizationId: orgId,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        phone: dto.phone,
-        email: dto.email.toLowerCase(),
-        address: dto.address,
-        drivingLicenceNumber: dto.drivingLicenceNumber,
+        firstName: dto.firstName.trim(),
+        lastName: dto.lastName.trim(),
+        phone: dto.phone.trim(),
+        email: dto.email.toLowerCase().trim(),
+        address: dto.address?.trim(),
+        drivingLicenceNumber: dto.drivingLicenceNumber.trim(),
+        nationalIdNumber: dto.nationalIdNumber?.trim(),
         licenceExpiryDate: dto.licenceExpiryDate,
-        documents: dto.documents ? JSON.stringify(dto.documents) : Prisma.JsonNull,
-        notes: dto.notes,
+        emergencyContact: dto.emergencyContact?.trim(),
+        avatarUrl: dto.avatarUrl,
+        rating: dto.rating !== undefined ? new Prisma.Decimal(dto.rating) : new Prisma.Decimal(5.0),
+        isBlacklisted: dto.isBlacklisted ?? false,
+        blacklistReason: dto.blacklistReason?.trim(),
+        documents: documentsJson,
+        notes: dto.notes?.trim(),
       },
     });
+
+    return this.findOne(orgId, created.id);
   }
 
   async findAll(orgId: string, query: CustomerQueryDto) {
@@ -30,13 +43,23 @@ export class CustomersService {
       organizationId: orgId,
     };
 
+    if (query.isBlacklisted !== undefined) {
+      where.isBlacklisted = query.isBlacklisted;
+    } else if (query.filter === 'blacklisted') {
+      where.isBlacklisted = true;
+    } else if (query.filter === 'vip') {
+      where.rating = { gte: 4.8 };
+    }
+
     if (query.search) {
+      const s = query.search.trim();
       where.OR = [
-        { firstName: { contains: query.search } },
-        { lastName: { contains: query.search } },
-        { email: { contains: query.search } },
-        { phone: { contains: query.search } },
-        { drivingLicenceNumber: { contains: query.search } },
+        { firstName: { contains: s } },
+        { lastName: { contains: s } },
+        { email: { contains: s } },
+        { phone: { contains: s } },
+        { drivingLicenceNumber: { contains: s } },
+        { nationalIdNumber: { contains: s } },
       ];
     }
 
@@ -46,14 +69,75 @@ export class CustomersService {
         where,
         skip: query.skip,
         take: query.take,
+        include: {
+          bookings: {
+            select: {
+              id: true,
+              totalAmount: true,
+              paidAmount: true,
+              balanceAmount: true,
+              bookingStatus: true,
+              paymentStatus: true,
+            },
+          },
+          _count: {
+            select: {
+              bookings: true,
+            },
+          },
+        },
         orderBy: {
           [query.sortBy || 'createdAt']: query.sortOrder || 'desc',
         },
       }),
     ]);
 
+    const enrichedItems = items.map((c) => {
+      let parsedDocs = [];
+      if (c.documents) {
+        try {
+          parsedDocs = typeof c.documents === 'string' ? JSON.parse(c.documents) : c.documents;
+        } catch {
+          parsedDocs = [];
+        }
+      }
+
+      const totalSpent = c.bookings.reduce((sum, b) => sum + Number(b.paidAmount || 0), 0);
+      const outstandingBalance = c.bookings
+        .filter((b) => b.bookingStatus !== 'CANCELLED')
+        .reduce((sum, b) => sum + Number(b.balanceAmount || 0), 0);
+
+      return {
+        id: c.id,
+        organizationId: c.organizationId,
+        firstName: c.firstName,
+        lastName: c.lastName,
+        fullName: `${c.firstName} ${c.lastName}`.trim(),
+        phone: c.phone,
+        phoneNumber: c.phone,
+        email: c.email,
+        address: c.address || 'Colombo, Sri Lanka',
+        drivingLicenceNumber: c.drivingLicenceNumber,
+        drivingLicenseNumber: c.drivingLicenceNumber,
+        nationalIdNumber: c.nationalIdNumber || '',
+        licenceExpiryDate: c.licenceExpiryDate,
+        emergencyContact: c.emergencyContact || '',
+        avatarUrl: c.avatarUrl || '',
+        rating: c.rating ? Number(c.rating) : 5.0,
+        isBlacklisted: c.isBlacklisted,
+        blacklistReason: c.blacklistReason || '',
+        notes: c.notes || '',
+        totalBookings: c._count.bookings,
+        totalSpent,
+        outstandingBalance,
+        documents: parsedDocs,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+      };
+    });
+
     return {
-      data: items,
+      data: enrichedItems,
       meta: {
         total,
         page: query.page || 1,
@@ -68,8 +152,7 @@ export class CustomersService {
       where: { id, organizationId: orgId },
       include: {
         bookings: {
-          orderBy: { createdAt: 'desc' },
-          take: 10,
+          orderBy: { pickupDateTime: 'desc' },
           include: {
             vehicle: {
               select: {
@@ -77,8 +160,15 @@ export class CustomersService {
                 make: true,
                 model: true,
                 registrationNumber: true,
+                category: true,
+                publicPhotos: true,
               },
             },
+          },
+        },
+        _count: {
+          select: {
+            bookings: true,
           },
         },
       },
@@ -88,24 +178,119 @@ export class CustomersService {
       throw new NotFoundException(`Customer profile with ID ${id} not found in this organization`);
     }
 
-    return customer;
+    let parsedDocs = [];
+    if (customer.documents) {
+      try {
+        parsedDocs = typeof customer.documents === 'string' ? JSON.parse(customer.documents) : customer.documents;
+      } catch {
+        parsedDocs = [];
+      }
+    }
+
+    const totalSpent = customer.bookings.reduce((sum, b) => sum + Number(b.paidAmount || 0), 0);
+    const outstandingBalance = customer.bookings
+      .filter((b) => b.bookingStatus !== 'CANCELLED')
+      .reduce((sum, b) => sum + Number(b.balanceAmount || 0), 0);
+
+    const bookingHistory = customer.bookings.map((b) => {
+      let photos: string[] = [];
+      if (b.vehicle.publicPhotos) {
+        try {
+          photos = typeof b.vehicle.publicPhotos === 'string'
+            ? JSON.parse(b.vehicle.publicPhotos)
+            : b.vehicle.publicPhotos;
+        } catch {
+          photos = [];
+        }
+      }
+
+      return {
+        bookingId: b.id,
+        bookingNumber: b.bookingNumber,
+        vehicleName: `${b.vehicle.make} ${b.vehicle.model}`,
+        licensePlate: b.vehicle.registrationNumber,
+        vehicleThumbnail: photos.length > 0 ? photos[0] : '',
+        startDate: b.pickupDateTime,
+        endDate: b.returnDateTime,
+        pickupDateTime: b.pickupDateTime,
+        returnDateTime: b.returnDateTime,
+        totalAmount: Number(b.totalAmount),
+        paidAmount: Number(b.paidAmount),
+        balanceAmount: Number(b.balanceAmount),
+        paymentStatus: b.paymentStatus,
+        status: b.bookingStatus,
+        bookingStatus: b.bookingStatus,
+      };
+    });
+
+    return {
+      id: customer.id,
+      organizationId: customer.organizationId,
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      fullName: `${customer.firstName} ${customer.lastName}`.trim(),
+      phone: customer.phone,
+      phoneNumber: customer.phone,
+      email: customer.email,
+      address: customer.address || 'Colombo, Sri Lanka',
+      drivingLicenceNumber: customer.drivingLicenceNumber,
+      drivingLicenseNumber: customer.drivingLicenceNumber,
+      nationalIdNumber: customer.nationalIdNumber || '',
+      licenceExpiryDate: customer.licenceExpiryDate,
+      emergencyContact: customer.emergencyContact || '',
+      avatarUrl: customer.avatarUrl || '',
+      rating: customer.rating ? Number(customer.rating) : 5.0,
+      isBlacklisted: customer.isBlacklisted,
+      blacklistReason: customer.blacklistReason || '',
+      notes: customer.notes || '',
+      totalBookings: customer._count.bookings,
+      totalSpent,
+      outstandingBalance,
+      documents: parsedDocs,
+      bookingHistory,
+      createdAt: customer.createdAt,
+      updatedAt: customer.updatedAt,
+    };
   }
 
   async update(orgId: string, id: string, dto: UpdateCustomerProfileDto) {
     await this.findOne(orgId, id);
 
-    return this.prisma.customerProfile.update({
+    let documentsJson: any = undefined;
+    if (dto.documents !== undefined) {
+      if (dto.documents === null) {
+        documentsJson = Prisma.JsonNull;
+      } else {
+        documentsJson = typeof dto.documents === 'string' ? JSON.parse(dto.documents) : dto.documents;
+      }
+    }
+
+    await this.prisma.customerProfile.update({
       where: { id },
       data: {
         ...dto,
-        email: dto.email ? dto.email.toLowerCase() : undefined,
-        documents: dto.documents ? JSON.stringify(dto.documents) : undefined,
+        email: dto.email ? dto.email.toLowerCase().trim() : undefined,
+        rating: dto.rating !== undefined ? new Prisma.Decimal(dto.rating) : undefined,
+        documents: documentsJson,
       },
     });
+
+    return this.findOne(orgId, id);
   }
 
   async remove(orgId: string, id: string) {
-    await this.findOne(orgId, id);
+    const customer = await this.findOne(orgId, id);
+
+    const activeBookings = await this.prisma.booking.count({
+      where: {
+        customerProfileId: id,
+        bookingStatus: { in: ['CONFIRMED', 'PICKED_UP'] },
+      },
+    });
+
+    if (activeBookings > 0) {
+      throw new BadRequestException('Cannot delete customer with active or confirmed bookings');
+    }
 
     return this.prisma.customerProfile.delete({
       where: { id },

@@ -57,6 +57,12 @@ export class BookingsService {
       throw new NotFoundException('Customer profile not found in your organization');
     }
 
+    if (customer.isBlacklisted) {
+      throw new BadRequestException(
+        `Cannot create booking: Customer ${customer.firstName} ${customer.lastName} is BLACKLISTED. Reason: ${customer.blacklistReason || 'High Risk Profile'}`,
+      );
+    }
+
     // 2. Verify vehicle belongs to organization
     const vehicle = await this.prisma.vehicle.findFirst({
       where: { id: dto.vehicleId, organizationId: orgId },
@@ -74,6 +80,22 @@ export class BookingsService {
       dto.discountAmount || 0,
       dto.depositAmount || 0,
     );
+
+    const insuranceFee = Number(dto.insuranceFee || 0);
+    const deliveryFee = Number(dto.deliveryFee || 0);
+    const initialPaid = Number(dto.paidAmount || 0);
+
+    const finalSubtotal = new Decimal(pricing.subtotal.toString()).add(insuranceFee).add(deliveryFee);
+    const finalTotalAmount = finalSubtotal;
+    const finalPaidAmount = new Decimal(initialPaid);
+    const finalBalanceAmount = Decimal.max(0, finalTotalAmount.sub(finalPaidAmount));
+
+    let paymentStatus: PaymentStatus = PaymentStatus.UNPAID;
+    if (finalBalanceAmount.isZero() && finalPaidAmount.greaterThan(0)) {
+      paymentStatus = PaymentStatus.PAID;
+    } else if (finalPaidAmount.greaterThan(0)) {
+      paymentStatus = PaymentStatus.PARTIALLY_PAID;
+    }
 
     const bookingNumber = BookingNumberUtil.generateDirectBookingNumber();
 
@@ -101,12 +123,12 @@ export class BookingsService {
           dailyRate: pricing.dailyRate,
           numberOfDays,
           discountAmount: pricing.discountAmount,
-          subtotal: pricing.subtotal,
+          subtotal: new Prisma.Decimal(finalSubtotal.toString()),
           depositAmount: pricing.depositAmount,
-          totalAmount: pricing.totalAmount,
-          paidAmount: pricing.paidAmount,
-          balanceAmount: pricing.balanceAmount,
-          paymentStatus: PaymentStatus.UNPAID,
+          totalAmount: new Prisma.Decimal(finalTotalAmount.toString()),
+          paidAmount: new Prisma.Decimal(finalPaidAmount.toString()),
+          balanceAmount: new Prisma.Decimal(finalBalanceAmount.toString()),
+          paymentStatus,
           bookingStatus: dto.bookingStatus || BookingStatus.CONFIRMED,
           notes: dto.notes,
         },
@@ -126,6 +148,24 @@ export class BookingsService {
             currency: 'USD',
             status: DepositStatus.PENDING,
             notes: `Security deposit for Booking #${booking.bookingNumber}`,
+          },
+        });
+      }
+
+      // 6. Record financial transaction if initial payment was received
+      if (finalPaidAmount.greaterThan(0)) {
+        await tx.financialTransaction.create({
+          data: {
+            organizationId: orgId,
+            vehicleId: booking.vehicleId,
+            bookingId: booking.id,
+            type: TransactionType.INCOME,
+            category: TransactionCategory.DIRECT_RENTAL,
+            amount: new Prisma.Decimal(finalPaidAmount.toString()),
+            currency: 'USD',
+            paymentMethod: dto.paymentMethod || 'CASH',
+            notes: `Advance rental payment for Booking #${booking.bookingNumber}`,
+            transactionDate: new Date(),
           },
         });
       }

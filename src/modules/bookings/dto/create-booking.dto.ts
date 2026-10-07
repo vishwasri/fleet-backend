@@ -10,7 +10,7 @@ import {
   IsUUID,
   Min,
 } from 'class-validator';
-import { BookingSource, BookingStatus, PaymentStatus } from '@prisma/client';
+import { BookingSource, BookingStatus } from '@prisma/client';
 
 export class CreateBookingDto {
   @ApiProperty({ description: 'Customer profile UUID' })
@@ -61,6 +61,32 @@ export class CreateBookingDto {
   @IsNumber()
   @Min(0)
   depositAmount?: number = 0;
+
+  @ApiPropertyOptional({ example: 0.0, default: 0, description: 'Insurance protection fee' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  insuranceFee?: number = 0;
+
+  @ApiPropertyOptional({ example: 0.0, default: 0, description: 'Delivery/Drop-off fee' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  deliveryFee?: number = 0;
+
+  @ApiPropertyOptional({ example: 0.0, default: 0, description: 'Initial advance payment amount collected' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  paidAmount?: number = 0;
+
+  @ApiPropertyOptional({ example: 'CASH', description: 'Payment method: CASH, CREDIT_CARD, BANK_TRANSFER, etc.' })
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
 
   @ApiPropertyOptional({ enum: BookingSource, default: BookingSource.INTERNAL })
   @IsOptional()

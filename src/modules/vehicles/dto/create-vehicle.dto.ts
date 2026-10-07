@@ -105,6 +105,11 @@ export class CreateVehicleDto {
   @IsInt()
   mileage?: number = 0;
 
+  @ApiPropertyOptional({ example: 'Pearl White', default: 'White' })
+  @IsOptional()
+  @IsString()
+  color?: string;
+
   @ApiPropertyOptional({ enum: FuelType, default: FuelType.PETROL })
   @IsOptional()
   @IsEnum(FuelType)

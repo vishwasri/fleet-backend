@@ -456,8 +456,122 @@ async function main() {
       email: 'david.miller@gmail.com',
       address: '742 Evergreen Terrace, Pasadena, CA 91101',
       drivingLicenceNumber: 'D88991234-CA',
+      nationalIdNumber: '9283910293',
       licenceExpiryDate: new Date('2028-10-15'),
-      notes: 'VIP customer, preferred EV renter.',
+      emergencyContact: '+14155551122 (Wife - Karen Miller)',
+      rating: new Prisma.Decimal(4.9),
+      isBlacklisted: false,
+      notes: 'VIP customer, preferred EV renter. Always returns vehicle cleaned and 90%+ charged.',
+      documents: [
+        {
+          id: 'cdoc_101',
+          title: 'California Driver License',
+          documentType: 'Driving License Front',
+          fileUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&fit=crop&q=80',
+          expiryDate: '2028-10-15T00:00:00.000Z',
+          isVerified: true,
+        },
+        {
+          id: 'cdoc_102',
+          title: 'Passport & Identity Verification',
+          documentType: 'Passport',
+          fileUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&auto=format&fit=crop&q=80',
+          expiryDate: '2031-04-20T00:00:00.000Z',
+          isVerified: true,
+        },
+      ],
+    },
+  });
+
+  const customer2 = await prisma.customerProfile.create({
+    data: {
+      organizationId: apexOrg.id,
+      firstName: 'Sarah',
+      lastName: 'Jenkins',
+      phone: '+14155553344',
+      email: 'sarah.jenkins@techcorp.io',
+      address: '120 Montgomery St, Suite 1400, San Francisco, CA 94104',
+      drivingLicenceNumber: 'DL-CA-442299',
+      nationalIdNumber: '4829103921',
+      licenceExpiryDate: new Date('2027-06-30'),
+      emergencyContact: '+14155554499 (HR - TechCorp)',
+      rating: new Prisma.Decimal(5.0),
+      isBlacklisted: false,
+      notes: 'Corporate client under TechCorp business account.',
+      documents: [
+        {
+          id: 'cdoc_201',
+          title: 'CA Driver License Front',
+          documentType: 'Driving License Front',
+          fileUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&fit=crop&q=80',
+          expiryDate: '2027-06-30T00:00:00.000Z',
+          isVerified: true,
+        },
+      ],
+    },
+  });
+
+  const customer3 = await prisma.customerProfile.create({
+    data: {
+      organizationId: apexOrg.id,
+      firstName: 'Marcus',
+      lastName: 'Vance',
+      phone: '+14155557711',
+      email: 'marcus.vance@yahoo.com',
+      address: '88 Ocean Boulevard, Santa Monica, CA 90401',
+      drivingLicenceNumber: 'DL-NV-991204',
+      nationalIdNumber: '1982940192',
+      licenceExpiryDate: new Date('2025-11-10'),
+      emergencyContact: '+14155550011 (Brother)',
+      rating: new Prisma.Decimal(2.1),
+      isBlacklisted: true,
+      blacklistReason: 'Unpaid traffic violations, excessive speeding fines, and 48hr unnotified late return.',
+      notes: 'DO NOT RENT. High risk account with outstanding penalty balance.',
+      documents: [
+        {
+          id: 'cdoc_301',
+          title: 'Driver License',
+          documentType: 'Driving License Front',
+          fileUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&fit=crop&q=80',
+          expiryDate: '2025-11-10T00:00:00.000Z',
+          isVerified: false,
+        },
+      ],
+    },
+  });
+
+  const customer4 = await prisma.customerProfile.create({
+    data: {
+      organizationId: apexOrg.id,
+      firstName: 'Elena',
+      lastName: 'Rostova',
+      phone: '+14155556622',
+      email: 'elena.rostova@designstudio.com',
+      address: '450 Sutter Street, San Francisco, CA 94108',
+      drivingLicenceNumber: 'DL-NY-338811',
+      nationalIdNumber: '5829104928',
+      licenceExpiryDate: new Date('2029-01-20'),
+      emergencyContact: '+14155558833',
+      rating: new Prisma.Decimal(4.8),
+      isBlacklisted: false,
+      notes: 'Luxury convertible enthusiast. Frequent weekend renter.',
+      documents: [
+        {
+          id: 'cdoc_401',
+          title: 'Driver License',
+          documentType: 'Driving License Front',
+          fileUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&fit=crop&q=80',
+          expiryDate: '2029-01-20T00:00:00.000Z',
+          isVerified: true,
+        },
+        {
+          id: 'cdoc_402',
+          title: 'Utility Bill (Residence Proof)',
+          documentType: 'Utility Bill',
+          fileUrl: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=800&auto=format&fit=crop&q=80',
+          isVerified: true,
+        },
+      ],
     },
   });
 
