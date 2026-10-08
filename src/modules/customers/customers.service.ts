@@ -49,6 +49,14 @@ export class CustomersService {
       where.isBlacklisted = true;
     } else if (query.filter === 'vip') {
       where.rating = { gte: 4.8 };
+    } else if (query.filter === 'active') {
+      where.bookings = {
+        some: {
+          bookingStatus: {
+            in: ['CONFIRMED', 'PICKED_UP', 'ACTIVE'],
+          },
+        },
+      };
     }
 
     if (query.search) {
