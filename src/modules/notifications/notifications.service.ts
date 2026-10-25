@@ -39,7 +39,7 @@ export class NotificationService {
   async listNotifications(orgId: string, query: NotificationQueryDto, userId?: string) {
     const where: Prisma.NotificationWhereInput = {
       organizationId: orgId,
-      userId: userId ? { in: [userId, null as any] } : undefined,
+      ...(userId ? { OR: [{ userId }, { userId: null }] } : {}),
       type: query.type,
       readAt: query.unreadOnly ? null : undefined,
     };
@@ -95,7 +95,7 @@ export class NotificationService {
     return this.prisma.notification.count({
       where: {
         organizationId: orgId,
-        userId: userId ? { in: [userId, null as any] } : undefined,
+        ...(userId ? { OR: [{ userId }, { userId: null }] } : {}),
         readAt: null,
       },
     });

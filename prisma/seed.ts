@@ -134,6 +134,18 @@ async function main() {
     },
   });
 
+    const ownerKamalasiri = await prisma.user.create({
+    data: {
+      email: 'dinuka@kamalasirirentacar.com',
+      passwordHash,
+      firstName: 'Dinuka',
+      lastName: 'Sampath',
+      phone: '778818288',
+      accountType: AccountType.BUSINESS_USER,
+      status: UserStatus.ACTIVE,
+    },
+  });
+
   const ownerMetro = await prisma.user.create({
     data: {
       email: 'owner@metrofleet.com',

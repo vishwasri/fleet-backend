@@ -16,7 +16,7 @@ import { InspectionItemStatus, VehicleInspectionType } from '@prisma/client';
 export class InspectionItemResultDto {
   @ApiPropertyOptional()
   @IsOptional()
-  @IsUUID()
+  @IsString()
   templateItemId?: string;
 
   @ApiProperty({ example: 'Front Bumper & Headlights' })
