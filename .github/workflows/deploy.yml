@@ -140,9 +140,9 @@ jobs:
             scp "${SCP_OPTS[@]}" /tmp/fleet-env-bootstrap "$DO_USER@$DO_HOST:$REMOTE_PATH/.env"
           fi
 
-          if [ -n "$GHCR_PULL_TOKEN" ]; then
-            printf '%s\n' "$GHCR_PULL_TOKEN" | ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" "docker login ghcr.io -u '${GHCR_PULL_USER:-$GHCR_OWNER}' --password-stdin"
-          fi
+          REGISTRY_TOKEN="${GHCR_PULL_TOKEN:-$GITHUB_TOKEN}"
+          REGISTRY_USER="${GHCR_PULL_USER:-$GITHUB_ACTOR}"
+          printf '%s\n' "$REGISTRY_TOKEN" | ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" "docker login ghcr.io -u '$REGISTRY_USER' --password-stdin"
 
           ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" bash -s -- "$REMOTE_PATH" "$GHCR_OWNER" "$IMAGE_TAG" <<'EOF'
           set -euo pipefail
@@ -159,7 +159,12 @@ jobs:
           { [ -s .env.tmp ] && awk '1' .env.tmp; printf 'GHCR_OWNER=%s\nIMAGE_TAG=%s\n' "$owner" "$tag"; } > .env
           rm -f .env.tmp
           chmod 600 .env
-          docker compose pull
+          if docker compose pull; then
+            docker logout ghcr.io >/dev/null 2>&1 || true
+          else
+            docker logout ghcr.io >/dev/null 2>&1 || true
+            exit 1
+          fi
           docker compose up -d --remove-orphans
           for i in $(seq 1 45); do
             if docker compose ps --status running --services | grep -qx api && docker compose exec -T api node -e "fetch('http://127.0.0.1:3000/api/docs').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" >/dev/null 2>&1; then
