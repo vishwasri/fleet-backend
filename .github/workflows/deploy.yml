@@ -57,6 +57,10 @@ jobs:
         with:
           sparse-checkout: |
             docker-compose.prod.yml
+            init-ssl.sh
+            renew-ssl.sh
+            nginx/bootstrap.conf.template
+            nginx/production.conf.template
 
       - name: Deploy over SSH
         env:
@@ -77,7 +81,8 @@ jobs:
           JWT_ACCESS_SECRET: ${{ secrets.FLEET_JWT_ACCESS_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.FLEET_JWT_REFRESH_SECRET }}
           CORS_ORIGINS: ${{ vars.FLEET_CORS_ORIGINS }}
-          FLEET_API_HOST_PORT: ${{ vars.FLEET_API_HOST_PORT }}
+          FLEET_DOMAIN: ${{ vars.FLEET_DOMAIN }}
+          FLEET_CERTBOT_EMAIL: ${{ vars.FLEET_CERTBOT_EMAIL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
         run: |
@@ -118,11 +123,13 @@ jobs:
           set -euo pipefail
           target="$1"
           case "$target" in "~/"*) target="$HOME/${target#~/}" ;; "~") target="$HOME" ;; esac
-          mkdir -p "$target"
+          mkdir -p "$target/nginx" "$target/certbot/conf" "$target/certbot/www"
           printf '%s' "$target"
           EOF
           )
           scp "${SCP_OPTS[@]}" docker-compose.prod.yml "$DO_USER@$DO_HOST:$REMOTE_PATH/docker-compose.yml"
+          scp "${SCP_OPTS[@]}" init-ssl.sh renew-ssl.sh "$DO_USER@$DO_HOST:$REMOTE_PATH/"
+          scp "${SCP_OPTS[@]}" nginx/bootstrap.conf.template nginx/production.conf.template "$DO_USER@$DO_HOST:$REMOTE_PATH/nginx/"
 
           HAS_REMOTE_ENV=$(ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" "[ -f '$REMOTE_PATH/.env' ] && echo yes || echo no")
           if [ "$HAS_REMOTE_ENV" = no ]; then
@@ -136,7 +143,8 @@ jobs:
               "JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET" \
               "JWT_REFRESH_EXPIRATION=7d" \
               "CORS_ORIGINS=${CORS_ORIGINS:-*}" \
-              "FLEET_API_HOST_PORT=${FLEET_API_HOST_PORT:-3001}" \
+              "FLEET_DOMAIN=${FLEET_DOMAIN:-rent.verssaro.com}" \
+              "FLEET_CERTBOT_EMAIL=${FLEET_CERTBOT_EMAIL:-admin@verssaro.com}" \
               > /tmp/fleet-env-bootstrap
             chmod 600 /tmp/fleet-env-bootstrap
             scp "${SCP_OPTS[@]}" /tmp/fleet-env-bootstrap "$DO_USER@$DO_HOST:$REMOTE_PATH/.env"
@@ -146,19 +154,21 @@ jobs:
           REGISTRY_USER="${GHCR_PULL_USER:-$GITHUB_ACTOR}"
           printf '%s\n' "$REGISTRY_TOKEN" | ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" "docker login ghcr.io -u '$REGISTRY_USER' --password-stdin"
 
-          ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" bash -s -- "$REMOTE_PATH" "$GHCR_OWNER" "$IMAGE_TAG" <<'EOF'
+          ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" bash -s -- "$REMOTE_PATH" "$GHCR_OWNER" "$IMAGE_TAG" "${FLEET_DOMAIN:-rent.verssaro.com}" "${FLEET_CERTBOT_EMAIL:-admin@verssaro.com}" <<'EOF'
           set -euo pipefail
           path="$1"
           owner="$2"
           tag="$3"
+          fleet_domain="$4"
+          certbot_email="$5"
           cd "$path"
           if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
             echo "Docker and the Docker Compose plugin must be installed on the droplet." >&2
             exit 1
           fi
           chmod 600 .env
-          grep -v -E '^(GHCR_OWNER|IMAGE_TAG)=' .env > .env.tmp || true
-          { [ -s .env.tmp ] && awk '1' .env.tmp; printf 'GHCR_OWNER=%s\nIMAGE_TAG=%s\n' "$owner" "$tag"; } > .env
+          grep -v -E '^(GHCR_OWNER|IMAGE_TAG|FLEET_DOMAIN|FLEET_CERTBOT_EMAIL|FLEET_API_HOST_PORT)=' .env > .env.tmp || true
+          { [ -s .env.tmp ] && awk '1' .env.tmp; printf 'GHCR_OWNER=%s\nIMAGE_TAG=%s\nFLEET_DOMAIN=%s\nFLEET_CERTBOT_EMAIL=%s\n' "$owner" "$tag" "$fleet_domain" "$certbot_email"; } > .env
           rm -f .env.tmp
           chmod 600 .env
           if docker compose pull; then
@@ -167,9 +177,20 @@ jobs:
             docker logout ghcr.io >/dev/null 2>&1 || true
             exit 1
           fi
+          chmod 700 init-ssl.sh renew-ssl.sh
+          ./init-ssl.sh "$fleet_domain" "$certbot_email" "$path"
           docker compose up -d --remove-orphans
+          docker compose exec -T nginx nginx -t
+
+          if ! command -v crontab >/dev/null 2>&1; then
+            apt-get update
+            apt-get install -y cron
+          fi
+          systemctl enable --now cron
+          cron_job="17 3 * * * $path/renew-ssl.sh '$path' >> /var/log/fleet-certbot-renew.log 2>&1"
+          (crontab -l 2>/dev/null | grep -Fv "$path/renew-ssl.sh" || true; printf '%s\n' "$cron_job") | crontab -
           for i in $(seq 1 45); do
-            if docker compose ps --status running --services | grep -qx api && docker compose exec -T api node -e "fetch('http://127.0.0.1:3000/api/docs').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" >/dev/null 2>&1; then
+            if docker compose ps --status running --services | grep -qx api && docker compose ps --status running --services | grep -qx nginx && docker compose exec -T api node -e "fetch('http://127.0.0.1:3000/api/docs').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" >/dev/null 2>&1; then
               echo "Fleet API is healthy."
               docker compose ps
               docker image prune -f >/dev/null 2>&1 || true

@@ -39,8 +39,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-UTC}
       DEFAULT_CURRENCY: ${DEFAULT_CURRENCY:-USD}
-    ports:
-      - "127.0.0.1:${FLEET_API_HOST_PORT:-3001}:3000"
+    expose:
+      - "3000"
     healthcheck:
       test: [ "CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/docs').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" ]
       interval: 15s
@@ -53,8 +53,31 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/active.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  certbot:
+    image: certbot/certbot:latest
+    profiles: [ "certbot" ]
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+
 volumes:
   fleet_mysql_data:
-
-networks:
-  default: {}
