@@ -77,6 +77,7 @@ jobs:
           JWT_ACCESS_SECRET: ${{ secrets.FLEET_JWT_ACCESS_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.FLEET_JWT_REFRESH_SECRET }}
           CORS_ORIGINS: ${{ vars.FLEET_CORS_ORIGINS }}
+          FLEET_API_HOST_PORT: ${{ vars.FLEET_API_HOST_PORT }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
         run: |
@@ -135,6 +136,7 @@ jobs:
               "JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET" \
               "JWT_REFRESH_EXPIRATION=7d" \
               "CORS_ORIGINS=${CORS_ORIGINS:-*}" \
+              "FLEET_API_HOST_PORT=${FLEET_API_HOST_PORT:-3001}" \
               > /tmp/fleet-env-bootstrap
             chmod 600 /tmp/fleet-env-bootstrap
             scp "${SCP_OPTS[@]}" /tmp/fleet-env-bootstrap "$DO_USER@$DO_HOST:$REMOTE_PATH/.env"
