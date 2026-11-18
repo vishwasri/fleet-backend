@@ -1,0 +1,176 @@
+name: Build & Deploy Fleet API to DigitalOcean
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-fleet-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    name: Build & Push API Image
+    runs-on: ubuntu-latest
+    outputs:
+      ghcr_owner: ${{ steps.meta.outputs.ghcr_owner }}
+      image_tag: ${{ github.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set lowercase GHCR owner
+        id: meta
+        run: echo "ghcr_owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.ghcr_owner }}/fleet-backend:${{ github.sha }}
+            ghcr.io/${{ steps.meta.outputs.ghcr_owner }}/fleet-backend:latest
+          cache-from: type=gha,scope=fleet-backend
+          cache-to: type=gha,mode=max,scope=fleet-backend
+
+  deploy-to-droplet:
+    name: Deploy API to DigitalOcean Droplet
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout deployment configuration
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            docker-compose.prod.yml
+
+      - name: Deploy over SSH
+        env:
+          DO_HOST: ${{ secrets.DO_HOST }}
+          DO_USER: ${{ secrets.DO_USER }}
+          DO_PORT: ${{ secrets.DO_PORT }}
+          DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
+          DO_SSH_KNOWN_HOSTS: ${{ secrets.DO_SSH_KNOWN_HOSTS }}
+          DEPLOY_PATH: ${{ secrets.FLEET_DEPLOY_PATH }}
+          GHCR_OWNER: ${{ needs.build-and-push.outputs.ghcr_owner }}
+          GHCR_PULL_USER: ${{ secrets.GHCR_PULL_USER }}
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+          MYSQL_DATABASE: ${{ secrets.FLEET_MYSQL_DATABASE }}
+          MYSQL_USER: ${{ secrets.FLEET_MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.FLEET_MYSQL_PASSWORD }}
+          MYSQL_ROOT_PASSWORD: ${{ secrets.FLEET_MYSQL_ROOT_PASSWORD }}
+          JWT_ACCESS_SECRET: ${{ secrets.FLEET_JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.FLEET_JWT_REFRESH_SECRET }}
+          CORS_ORIGINS: ${{ vars.FLEET_CORS_ORIGINS }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          [ -n "$DO_HOST" ] || missing+=("DO_HOST")
+          [ -n "$DO_USER" ] || missing+=("DO_USER")
+          [ -n "$DO_SSH_KEY" ] || missing+=("DO_SSH_KEY")
+          [ -n "$MYSQL_PASSWORD" ] || missing+=("FLEET_MYSQL_PASSWORD")
+          [ -n "$MYSQL_ROOT_PASSWORD" ] || missing+=("FLEET_MYSQL_ROOT_PASSWORD")
+          [ -n "$JWT_ACCESS_SECRET" ] || missing+=("FLEET_JWT_ACCESS_SECRET")
+          [ -n "$JWT_REFRESH_SECRET" ] || missing+=("FLEET_JWT_REFRESH_SECRET")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Missing required GitHub Actions secrets: ${missing[*]}" >&2
+            exit 1
+          fi
+
+          SSH_PORT="${DO_PORT:-22}"
+          DEPLOY_PATH="${DEPLOY_PATH:-/opt/fleet}"
+          cleanup() { rm -f "$HOME/.ssh/fleet_deploy_key" /tmp/fleet-env-bootstrap; }
+          trap cleanup EXIT
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$DO_SSH_KEY" > "$HOME/.ssh/fleet_deploy_key"
+          chmod 600 "$HOME/.ssh/fleet_deploy_key"
+          if [ -n "$DO_SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$DO_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          else
+            ssh-keyscan -p "$SSH_PORT" -H "$DO_HOST" > "$HOME/.ssh/known_hosts" 2>/dev/null
+          fi
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+          SSH_OPTS=(-i "$HOME/.ssh/fleet_deploy_key" -p "$SSH_PORT" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=15)
+          SCP_OPTS=(-i "$HOME/.ssh/fleet_deploy_key" -P "$SSH_PORT" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=15)
+
+          REMOTE_PATH=$(ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" bash -s -- "$DEPLOY_PATH" <<'EOF'
+          set -euo pipefail
+          target="$1"
+          case "$target" in "~/"*) target="$HOME/${target#~/}" ;; "~") target="$HOME" ;; esac
+          mkdir -p "$target"
+          printf '%s' "$target"
+          EOF
+          )
+          scp "${SCP_OPTS[@]}" docker-compose.prod.yml "$DO_USER@$DO_HOST:$REMOTE_PATH/docker-compose.yml"
+
+          HAS_REMOTE_ENV=$(ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" "[ -f '$REMOTE_PATH/.env' ] && echo yes || echo no")
+          if [ "$HAS_REMOTE_ENV" = no ]; then
+            printf '%s\n' \
+              "MYSQL_DATABASE=${MYSQL_DATABASE:-fleet_db}" \
+              "MYSQL_USER=${MYSQL_USER:-fleet_user}" \
+              "MYSQL_PASSWORD=$MYSQL_PASSWORD" \
+              "MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD" \
+              "JWT_ACCESS_SECRET=$JWT_ACCESS_SECRET" \
+              "JWT_ACCESS_EXPIRATION=15m" \
+              "JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET" \
+              "JWT_REFRESH_EXPIRATION=7d" \
+              "CORS_ORIGINS=${CORS_ORIGINS:-*}" \
+              > /tmp/fleet-env-bootstrap
+            chmod 600 /tmp/fleet-env-bootstrap
+            scp "${SCP_OPTS[@]}" /tmp/fleet-env-bootstrap "$DO_USER@$DO_HOST:$REMOTE_PATH/.env"
+          fi
+
+          if [ -n "$GHCR_PULL_TOKEN" ]; then
+            printf '%s\n' "$GHCR_PULL_TOKEN" | ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" "docker login ghcr.io -u '${GHCR_PULL_USER:-$GHCR_OWNER}' --password-stdin"
+          fi
+
+          ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" bash -s -- "$REMOTE_PATH" "$GHCR_OWNER" "$IMAGE_TAG" <<'EOF'
+          set -euo pipefail
+          path="$1"
+          owner="$2"
+          tag="$3"
+          cd "$path"
+          if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+            echo "Docker and the Docker Compose plugin must be installed on the droplet." >&2
+            exit 1
+          fi
+          chmod 600 .env
+          grep -v -E '^(GHCR_OWNER|IMAGE_TAG)=' .env > .env.tmp || true
+          { [ -s .env.tmp ] && awk '1' .env.tmp; printf 'GHCR_OWNER=%s\nIMAGE_TAG=%s\n' "$owner" "$tag"; } > .env
+          rm -f .env.tmp
+          chmod 600 .env
+          docker compose pull
+          docker compose up -d --remove-orphans
+          for i in $(seq 1 45); do
+            if docker compose ps --status running --services | grep -qx api && docker compose exec -T api node -e "fetch('http://127.0.0.1:3000/api/docs').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" >/dev/null 2>&1; then
+              echo "Fleet API is healthy."
+              docker compose ps
+              docker image prune -f >/dev/null 2>&1 || true
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Fleet API health check did not pass. Recent logs:" >&2
+          docker compose logs --tail=60 >&2
+          exit 1
+          EOF
