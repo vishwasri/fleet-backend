@@ -167,16 +167,13 @@ jobs:
             exit 1
           fi
           chmod 600 .env
-          grep -v -E '^(GHCR_OWNER|IMAGE_TAG|FLEET_DOMAIN|FLEET_CERTBOT_EMAIL|FLEET_API_HOST_PORT)=' .env > .env.tmp || true
-          { [ -s .env.tmp ] && awk '1' .env.tmp; printf 'GHCR_OWNER=%s\nIMAGE_TAG=%s\nFLEET_DOMAIN=%s\nFLEET_CERTBOT_EMAIL=%s\n' "$owner" "$tag" "$fleet_domain" "$certbot_email"; } > .env
+          grep -v -E '^(GHCR_OWNER|BACKEND_IMAGE_TAG|FLEET_DOMAIN|FLEET_CERTBOT_EMAIL|FLEET_API_HOST_PORT)=' .env > .env.tmp || true
+          { [ -s .env.tmp ] && awk '1' .env.tmp; printf 'GHCR_OWNER=%s\nBACKEND_IMAGE_TAG=%s\nFLEET_DOMAIN=%s\nFLEET_CERTBOT_EMAIL=%s\n' "$owner" "$tag" "$fleet_domain" "$certbot_email"; } > .env
           rm -f .env.tmp
           chmod 600 .env
-          if docker compose pull; then
-            docker logout ghcr.io >/dev/null 2>&1 || true
-          else
-            docker logout ghcr.io >/dev/null 2>&1 || true
-            exit 1
-          fi
+          # Pull API and dependencies (without failing if web image isn't published yet)
+          docker compose pull mysql api nginx || docker compose pull
+          docker logout ghcr.io >/dev/null 2>&1 || true
           chmod 700 init-ssl.sh renew-ssl.sh
           ./init-ssl.sh "$fleet_domain" "$certbot_email" "$path"
           docker compose up -d --remove-orphans

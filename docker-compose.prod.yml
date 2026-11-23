@@ -22,7 +22,7 @@ services:
         max-file: "3"
 
   api:
-    image: ghcr.io/${GHCR_OWNER:?Set GHCR_OWNER in .env}/fleet-backend:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GHCR_OWNER:?Set GHCR_OWNER in .env}/fleet-backend:${BACKEND_IMAGE_TAG:-${IMAGE_TAG:-latest}}
     restart: unless-stopped
     depends_on:
       mysql:
@@ -53,11 +53,37 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  web:
+    image: ghcr.io/${GHCR_OWNER:?Set GHCR_OWNER in .env}/fleet-web:${WEB_IMAGE_TAG:-${IMAGE_TAG:-latest}}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_BASE_URL: https://${FLEET_DOMAIN:-rent.verssaro.com}/api
+    expose:
+      - "3000"
+    healthcheck:
+      test: [ "CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   nginx:
     image: nginx:stable-alpine
     restart: unless-stopped
     depends_on:
       api:
+        condition: service_healthy
+      web:
         condition: service_healthy
     ports:
       - "80:80"
