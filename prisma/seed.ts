@@ -88,27 +88,45 @@ async function main() {
   }
 
   const saltRounds = 10;
-  const passwordHash = await bcrypt.hash('Fleet2026!Secure', saltRounds);
+  const superAdminPasswordHash = await bcrypt.hash('Fucku2@ft', saltRounds);
+  const fallbackPasswordHash = await bcrypt.hash('Fleet2026!Secure', saltRounds);
 
   // ==========================================
   // 1. CREATE SUPER ADMIN PLATFORM OPERATOR
   // ==========================================
-  console.log('Creating SaaS Platform Admin user...');
+  console.log('Creating SaaS Platform Super Admin users...');
   const platformAdmin = await prisma.user.create({
     data: {
+      email: 'vs.srimal@gmail.com',
+      passwordHash: superAdminPasswordHash,
+      firstName: 'Vishwa',
+      lastName: 'Amarasinghe',
+      phone: '0778818288',
+      accountType: AccountType.PLATFORM_ADMIN,
+      status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
+      phoneVerifiedAt: new Date(),
+    },
+  });
+
+  await prisma.user.create({
+    data: {
       email: 'admin@fleetplatform.internal',
-      passwordHash,
+      passwordHash: fallbackPasswordHash,
       firstName: 'Super',
       lastName: 'Admin',
       phone: '+94779990000',
       accountType: AccountType.PLATFORM_ADMIN,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
+      phoneVerifiedAt: new Date(),
     },
   });
 
   console.log('✅ Real-world database reset & initialized successfully:');
   console.log(`   - 10 Vehicle Categories created`);
-  console.log(`   - SaaS Platform Super Admin created: ${platformAdmin.email}`);
+  console.log(`   - Super Admin created: ${platformAdmin.firstName} ${platformAdmin.lastName} (${platformAdmin.email}, phone: ${platformAdmin.phone})`);
+  console.log(`   - Backup Super Admin: admin@fleetplatform.internal`);
   console.log(`   - All tenants, bookings, vehicles, and test users cleared.`);
 }
 
