@@ -4,7 +4,6 @@ import { ConfigService } from '@nestjs/config';
 export interface SmsSendResult {
   success: boolean;
   messageId?: string;
-  simulated?: boolean;
   error?: string;
 }
 
@@ -12,7 +11,7 @@ export interface SmsSendResult {
 export class SmsService {
   private readonly logger = new Logger(SmsService.name);
   private readonly baseUrl: string;
-  private readonly apiToken: string | undefined;
+  private readonly apiToken: string;
   private readonly senderId: string;
 
   constructor(private readonly configService: ConfigService) {
@@ -20,8 +19,14 @@ export class SmsService {
       this.configService.get<string>('SMSAPI_BASE_URL') ||
       'https://dashboard.smsapi.lk/api/v3'
     ).replace(/\/+$/, '');
-    this.apiToken = this.configService.get<string>('SMSAPI_API_TOKEN');
-    this.senderId = this.configService.get<string>('SMSAPI_SENDER_ID') || 'FleetLink';
+    this.apiToken = (
+      this.configService.get<string>('SMSAPI_API_TOKEN') ||
+      '568|rGV8TbUQsgHdL7YqOcHTHtjJKK6XofBChN2FxH46'
+    ).trim();
+    this.senderId = (
+      this.configService.get<string>('SMSAPI_SENDER_ID') ||
+      'VERSSARO'
+    ).trim();
   }
 
   /**
@@ -80,14 +85,11 @@ export class SmsService {
       messageText = `Your FleetLink password reset code is ${otpCode}. Valid for 5 minutes.`;
     }
 
-    // If SMSAPI token is not configured or in development mode, simulate and log prominently
     if (!this.apiToken) {
-      this.logger.warn(
-        `[SMSAPI.LK SIMULATOR] No SMSAPI_API_TOKEN set in environment. Simulated SMS dispatch to ${formattedPhone}: "${messageText}"`,
-      );
+      this.logger.error(`SMS dispatch failed: No SMSAPI_API_TOKEN set in environment.`);
       return {
-        success: true,
-        simulated: true,
+        success: false,
+        error: 'SMS service is not configured. Missing SMSAPI_API_TOKEN.',
       };
     }
 
@@ -125,7 +127,6 @@ export class SmsService {
       return {
         success: true,
         messageId: responseData.data?.uid || responseData.message_id,
-        simulated: false,
       };
     } catch (err: any) {
       this.logger.error(`Failed to reach SMSAPI.LK: ${err.message}`, err.stack);

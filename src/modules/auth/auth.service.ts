@@ -4,6 +4,7 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -297,13 +298,18 @@ export class AuthService {
     // Send SMS via smsapi.lk
     const smsResult = await this.smsService.sendOtp(normalized, otp, purpose);
 
+    if (!smsResult.success) {
+      throw new InternalServerErrorException(
+        smsResult.error || 'Failed to dispatch SMS verification code via SMSAPI.LK',
+      );
+    }
+
     return {
       success: true,
       message: 'Verification code sent successfully via SMS',
       phone: normalized,
       maskedPhone: this.smsService.maskPhoneNumber(normalized),
       expiresInSeconds: 300,
-      simulated: smsResult.simulated || false,
     };
   }
 

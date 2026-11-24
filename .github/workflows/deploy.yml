@@ -145,6 +145,8 @@ jobs:
               "CORS_ORIGINS=${CORS_ORIGINS:-*}" \
               "FLEET_DOMAIN=${FLEET_DOMAIN:-rent.verssaro.com}" \
               "FLEET_CERTBOT_EMAIL=${FLEET_CERTBOT_EMAIL:-admin@verssaro.com}" \
+              "SMSAPI_API_TOKEN=568|rGV8TbUQsgHdL7YqOcHTHtjJKK6XofBChN2FxH46" \
+              "SMSAPI_SENDER_ID=VERSSARO" \
               > /tmp/fleet-env-bootstrap
             chmod 600 /tmp/fleet-env-bootstrap
             scp "${SCP_OPTS[@]}" /tmp/fleet-env-bootstrap "$DO_USER@$DO_HOST:$REMOTE_PATH/.env"
@@ -167,8 +169,8 @@ jobs:
             exit 1
           fi
           chmod 600 .env
-          grep -v -E '^(GHCR_OWNER|BACKEND_IMAGE_TAG|FLEET_DOMAIN|FLEET_CERTBOT_EMAIL|FLEET_API_HOST_PORT)=' .env > .env.tmp || true
-          { [ -s .env.tmp ] && awk '1' .env.tmp; printf 'GHCR_OWNER=%s\nBACKEND_IMAGE_TAG=%s\nFLEET_DOMAIN=%s\nFLEET_CERTBOT_EMAIL=%s\n' "$owner" "$tag" "$fleet_domain" "$certbot_email"; } > .env
+          grep -v -E '^(GHCR_OWNER|BACKEND_IMAGE_TAG|FLEET_DOMAIN|FLEET_CERTBOT_EMAIL|FLEET_API_HOST_PORT|SMSAPI_API_TOKEN|SMSAPI_SENDER_ID)=' .env > .env.tmp || true
+          { [ -s .env.tmp ] && awk '1' .env.tmp; printf 'GHCR_OWNER=%s\nBACKEND_IMAGE_TAG=%s\nFLEET_DOMAIN=%s\nFLEET_CERTBOT_EMAIL=%s\nSMSAPI_API_TOKEN=%s\nSMSAPI_SENDER_ID=%s\n' "$owner" "$tag" "$fleet_domain" "$certbot_email" "568|rGV8TbUQsgHdL7YqOcHTHtjJKK6XofBChN2FxH46" "VERSSARO"; } > .env
           rm -f .env.tmp
           chmod 600 .env
           # Clean up any stale recreate containers or dead containers before recreating services
