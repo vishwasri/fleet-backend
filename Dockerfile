@@ -33,4 +33,4 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate --accept-data-loss && node dist/src/main"]

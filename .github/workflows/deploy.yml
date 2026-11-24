@@ -188,6 +188,9 @@ jobs:
             docker compose up -d --remove-orphans --force-recreate
           fi
 
+          echo "Applying database schema updates via Prisma db push..."
+          docker compose exec -T api npx prisma db push --skip-generate --accept-data-loss
+
           docker compose exec -T nginx nginx -t
 
           if ! command -v crontab >/dev/null 2>&1; then
