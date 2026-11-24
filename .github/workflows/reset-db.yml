@@ -1,0 +1,57 @@
+name: Reset Cloud Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "RESET" to confirm wiping all cloud database tables'
+        required: true
+        default: ''
+
+jobs:
+  reset-database:
+    name: Reset Cloud MySQL Database
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "RESET" ]; then
+            echo "Error: You must type 'RESET' to confirm database wipe." >&2
+            exit 1
+          fi
+
+      - name: Execute Database Reset via SSH
+        env:
+          DO_HOST: ${{ secrets.DO_HOST }}
+          DO_USER: ${{ secrets.DO_USER }}
+          DO_PORT: ${{ secrets.DO_PORT }}
+          DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
+          DO_SSH_KNOWN_HOSTS: ${{ secrets.DO_SSH_KNOWN_HOSTS }}
+          DEPLOY_PATH: ${{ secrets.FLEET_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_PORT="${DO_PORT:-22}"
+          DEPLOY_PATH="${DEPLOY_PATH:-/opt/fleet}"
+          cleanup() { rm -f "$HOME/.ssh/fleet_deploy_key"; }
+          trap cleanup EXIT
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$DO_SSH_KEY" > "$HOME/.ssh/fleet_deploy_key"
+          chmod 600 "$HOME/.ssh/fleet_deploy_key"
+          if [ -n "$DO_SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$DO_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          else
+            ssh-keyscan -p "$SSH_PORT" -H "$DO_HOST" > "$HOME/.ssh/known_hosts" 2>/dev/null
+          fi
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+          SSH_OPTS=(-i "$HOME/.ssh/fleet_deploy_key" -p "$SSH_PORT" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=15)
+
+          ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" bash -s -- "$DEPLOY_PATH" <<'EOF'
+          set -euo pipefail
+          target="$1"
+          cd "$target"
+          echo "Resetting cloud database via API container..."
+          docker compose exec -T api node dist/prisma/seed.js
+          echo "Database reset complete!"
+          EOF

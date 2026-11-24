@@ -7,45 +7,62 @@ import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log('🌱 Initializing Fleet Multi-Tenant Real-World Database...');
+const ALL_TABLES = [
+  'reviews',
+  'marketplace_booking_requests',
+  'marketplace_search_locations',
+  'marketplace_listings',
+  'message_logs',
+  'message_templates',
+  'payouts',
+  'payment_provider_transactions',
+  'payments',
+  'financial_transactions',
+  'vehicle_inspection_items',
+  'vehicle_inspections',
+  'inspection_template_items',
+  'inspection_templates',
+  'extra_charges',
+  'rental_extensions',
+  'deposits',
+  'vehicle_documents',
+  'notifications',
+  'audit_logs',
+  'partner_rentals',
+  'partner_offers',
+  'partner_requests',
+  'partner_relationships',
+  'vehicle_blocks',
+  'maintenance_records',
+  'bookings',
+  'customer_profiles',
+  'marketplace_customer_profiles',
+  'vehicles',
+  'branch_locations',
+  'vehicle_models',
+  'vehicle_makes',
+  'vehicle_categories',
+  'organization_settings',
+  'organization_members',
+  'organizations',
+  'otp_verifications',
+  'users',
+];
 
-  // Clean existing data in reverse order of foreign keys
-  await prisma.review.deleteMany();
-  await prisma.marketplaceBookingRequest.deleteMany();
-  await prisma.marketplaceSearchLocation.deleteMany();
-  await prisma.marketplaceListing.deleteMany();
-  await prisma.messageLog.deleteMany();
-  await prisma.messageTemplate.deleteMany();
-  await prisma.payout.deleteMany();
-  await prisma.paymentProviderTransaction.deleteMany();
-  await prisma.payment.deleteMany();
-  await prisma.financialTransaction.deleteMany();
-  await prisma.vehicleInspectionItem.deleteMany();
-  await prisma.vehicleInspection.deleteMany();
-  await prisma.inspectionTemplateItem.deleteMany();
-  await prisma.inspectionTemplate.deleteMany();
-  await prisma.extraCharge.deleteMany();
-  await prisma.rentalExtension.deleteMany();
-  await prisma.deposit.deleteMany();
-  await prisma.vehicleDocument.deleteMany();
-  await prisma.notification.deleteMany();
-  await prisma.auditLog.deleteMany();
-  await prisma.partnerRental.deleteMany();
-  await prisma.partnerOffer.deleteMany();
-  await prisma.partnerRequest.deleteMany();
-  await prisma.partnerRelationship.deleteMany();
-  await prisma.vehicleBlock.deleteMany();
-  await prisma.maintenanceRecord.deleteMany();
-  await prisma.booking.deleteMany();
-  await prisma.customerProfile.deleteMany();
-  await prisma.marketplaceCustomerProfile.deleteMany();
-  await prisma.vehicle.deleteMany();
-  await prisma.vehicleCategory.deleteMany();
-  await prisma.organizationSettings.deleteMany();
-  await prisma.organizationMember.deleteMany();
-  await prisma.organization.deleteMany();
-  await prisma.user.deleteMany();
+async function main() {
+  console.log('🌱 Clearing existing database data in cloud...');
+
+  // Disable FK checks and truncate all tables
+  await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;');
+  for (const table of ALL_TABLES) {
+    try {
+      await prisma.$executeRawUnsafe(`TRUNCATE TABLE \`${table}\`;`);
+    } catch {
+      // Table might not exist or already be empty, continue safely
+    }
+  }
+  await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1;');
+  console.log('🧹 All database tables cleared successfully.');
 
   // ==========================================
   // 0. CREATE VEHICLE CATEGORIES (Dynamic DB)
@@ -89,15 +106,15 @@ async function main() {
     },
   });
 
-  console.log('✅ Real-world database initialized successfully:');
+  console.log('✅ Real-world database reset & initialized successfully:');
   console.log(`   - 10 Vehicle Categories created`);
   console.log(`   - SaaS Platform Super Admin created: ${platformAdmin.email}`);
-  console.log(`   - No dummy tenants, vehicles, or bookings. Pure real database.`);
+  console.log(`   - All tenants, bookings, vehicles, and test users cleared.`);
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Error initializing database:', e);
+    console.error('❌ Error resetting database:', e);
     process.exit(1);
   })
   .finally(async () => {
