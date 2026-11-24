@@ -39,6 +39,20 @@ enum MemberStatus {
   INACTIVE
 }
 
+enum OrganizationStatus {
+  ACTIVE
+  PENDING_SETUP
+  SUSPENDED
+  CANCELLED
+}
+
+enum SubscriptionPlan {
+  FREE_TRIAL
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
 enum MarketplaceStatus {
   PRIVATE
   PENDING_REVIEW
@@ -352,24 +366,48 @@ model User {
   marketplaceBookings MarketplaceBookingRequest[]
   reviews           Review[]
 
+  @@index([phone])
   @@map("users")
 }
 
+model OtpVerification {
+  id         String   @id @default(uuid())
+  phone      String   @db.VarChar(30)
+  otpHash    String   @db.VarChar(255)
+  purpose    String   @default("LOGIN") // LOGIN, REGISTER, PASSWORD_RESET
+  expiresAt  DateTime
+  verified   Boolean  @default(false)
+  attempts   Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([phone, purpose])
+  @@map("otp_verifications")
+}
+
 model Organization {
-  id                    String            @id @default(uuid())
+  id                    String             @id @default(uuid())
+  slug                  String?            @unique
   legalName             String
   displayName           String
   email                 String
   phone                 String
-  address               String?           @db.Text
-  timezone              String            @default("UTC")
-  currency              String            @default("USD")
-  logoUrl               String?           @db.VarChar(500)
-  description           String?           @db.Text
-  marketplaceStatus     MarketplaceStatus @default(PRIVATE)
-  acceptsOnlineBookings Boolean           @default(false)
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  address               String?            @db.Text
+  timezone              String             @default("UTC")
+  currency              String             @default("USD")
+  logoUrl               String?            @db.VarChar(500)
+  description           String?            @db.Text
+  marketplaceStatus     MarketplaceStatus  @default(PRIVATE)
+  acceptsOnlineBookings Boolean            @default(false)
+  status                OrganizationStatus @default(ACTIVE)
+  subscriptionPlan      SubscriptionPlan   @default(STARTER)
+  maxVehicles           Int                @default(20)
+  maxMembers            Int                @default(5)
+  billingCycle          String             @default("MONTHLY")
+  planExpiresAt         DateTime?
+  businessRegNumber     String?            @db.VarChar(100)
+  taxId                 String?            @db.VarChar(100)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
   // Relations
   settings              OrganizationSettings?

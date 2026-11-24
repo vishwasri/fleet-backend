@@ -1,13 +1,21 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  Param,
   Patch,
+  Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { OrganizationsService } from './organizations.service';
-import { UpdateOrganizationDto, UpdateMarketplaceStatusDto } from './dto/update-organization.dto';
+import {
+  UpdateOrganizationDto,
+  UpdateMarketplaceStatusDto,
+  InviteMemberDto,
+  UpdateMemberRoleDto,
+} from './dto/update-organization.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgTenantGuard } from '../../common/guards/org-tenant.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -25,7 +33,7 @@ export class OrganizationsController {
 
   @Get('current')
   @Roles(OrgRole.VIEWER)
-  @ApiOperation({ summary: 'Get current organization details, settings and summary stats' })
+  @ApiOperation({ summary: 'Get current organization details, settings, members, and quota summary' })
   async getCurrentOrganization(@CurrentOrgId() orgId: string) {
     return this.organizationsService.getOrganization(orgId);
   }
@@ -48,5 +56,43 @@ export class OrganizationsController {
     @Body() dto: UpdateMarketplaceStatusDto,
   ) {
     return this.organizationsService.updateMarketplaceStatus(orgId, dto);
+  }
+
+  @Get('current/members')
+  @Roles(OrgRole.VIEWER)
+  @ApiOperation({ summary: 'List all staff members and role assignments for current organization' })
+  async getMembers(@CurrentOrgId() orgId: string) {
+    return this.organizationsService.getMembers(orgId);
+  }
+
+  @Post('current/members')
+  @Roles(OrgRole.ADMIN)
+  @ApiOperation({ summary: 'Invite or onboard a new team member to current organization' })
+  async addMember(
+    @CurrentOrgId() orgId: string,
+    @Body() dto: InviteMemberDto,
+  ) {
+    return this.organizationsService.addMember(orgId, dto);
+  }
+
+  @Patch('current/members/:id')
+  @Roles(OrgRole.ADMIN)
+  @ApiOperation({ summary: 'Update role for an organization staff member' })
+  async updateMemberRole(
+    @CurrentOrgId() orgId: string,
+    @Param('id') memberId: string,
+    @Body() dto: UpdateMemberRoleDto,
+  ) {
+    return this.organizationsService.updateMemberRole(orgId, memberId, dto);
+  }
+
+  @Delete('current/members/:id')
+  @Roles(OrgRole.OWNER)
+  @ApiOperation({ summary: 'Remove a team member from the organization' })
+  async removeMember(
+    @CurrentOrgId() orgId: string,
+    @Param('id') memberId: string,
+  ) {
+    return this.organizationsService.removeMember(orgId, memberId);
   }
 }

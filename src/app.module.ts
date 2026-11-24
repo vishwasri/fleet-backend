@@ -25,6 +25,7 @@ import { ExtensionsModule } from './modules/extensions/extensions.module';
 import { ExtraChargesModule } from './modules/extra-charges/extra-charges.module';
 import { InspectionsModule } from './modules/inspections/inspections.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     DashboardModule,
     ReportsModule,
     MarketplaceModule,
+    SuperAdminModule,
   ],
 })
 export class AppModule {}

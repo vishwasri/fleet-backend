@@ -18,6 +18,12 @@ export class RolesGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
+
+    // Platform admin bypass
+    if (request.user?.accountType === 'PLATFORM_ADMIN') {
+      return true;
+    }
+
     const userRole = request.memberRole || request.user?.currentOrgRole;
 
     if (!userRole) {

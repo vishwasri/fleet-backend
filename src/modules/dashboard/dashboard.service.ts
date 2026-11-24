@@ -290,16 +290,24 @@ export class DashboardService {
       })),
     ];
 
+    const unreadNotificationsCount = await this.prisma.notification.count({
+      where: { organizationId: orgId, readAt: null },
+    });
+
     return {
+      totalVehicles: pulse.fleetSummary.totalVehicles,
       availableVehicles: pulse.fleetSummary.availableVehicles,
       activeRentals: pulse.fleetSummary.directRentals + pulse.fleetSummary.partnerRentals,
       inMaintenance: pulse.fleetSummary.inMaintenance,
-      partnerRentals: pulse.fleetSummary.partnerRentals,
+      partnerLoans: pulse.fleetSummary.partnerRentals,
+      fleetUtilizationPercent: pulse.fleetSummary.utilizationRate,
       todayPickupsCount: pulse.todayOperations.directPickupsCount + pulse.todayOperations.partnerPickupsCount,
       todayReturnsCount: pulse.todayOperations.directReturnsCount + pulse.todayOperations.partnerReturnsCount,
       monthRevenue: pulse.monthlyFinancials.totalRevenue,
       monthExpenses: pulse.monthlyFinancials.expenses,
-      outstandingPayments: pulse.outstandingBalances.totalOutstanding,
+      netProfit: pulse.monthlyFinancials.netProfit,
+      escrowDepositsHeld: pulse.outstandingBalances.totalOutstanding,
+      unreadNotificationsCount,
       alerts,
       todaySchedule,
     };

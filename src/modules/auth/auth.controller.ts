@@ -5,12 +5,14 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterOrganizationDto } from './dto/register-organization.dto';
 import { LoginDto, RefreshTokenDto, PasswordResetRequestDto, PasswordResetConfirmDto } from './dto/login.dto';
+import { SendPhoneOtpDto, VerifyPhoneOtpDto, ResetPasswordPhoneDto } from './dto/phone-auth.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -42,11 +44,30 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token using valid refresh token' })
   async refresh(@Body() dto: RefreshTokenDto) {
-    // Decode token or payload
-    const decoded: any = JSON.parse(
-      Buffer.from(dto.refreshToken.split('.')[1], 'base64').toString(),
-    );
-    return this.authService.refreshTokens(decoded.sub, dto.refreshToken);
+    if (!dto.refreshToken || typeof dto.refreshToken !== 'string') {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+    let decoded: any;
+    try {
+      const parts = dto.refreshToken.split('.');
+      if (parts.length !== 3) {
+        throw new Error('Invalid JWT format');
+      }
+      decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+    } catch {
+      throw new UnauthorizedException('Invalid or malformed refresh token');
+    }
+
+    if (!decoded?.sub) {
+      throw new UnauthorizedException('Invalid refresh token payload');
+    }
+
+    const tokens = await this.authService.refreshTokens(decoded.sub, dto.refreshToken);
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      tokens,
+    };
   }
 
   @Post('logout')
@@ -80,5 +101,32 @@ export class AuthController {
   @ApiOperation({ summary: 'Confirm password reset with token' })
   async resetPassword(@Body() dto: PasswordResetConfirmDto) {
     return this.authService.resetPassword(dto.token, dto.newPassword);
+  }
+
+  @Public()
+  @Post('phone/otp/send')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send 6-digit SMS verification code to mobile phone via SMSAPI.LK' })
+  @ApiResponse({ status: 200, description: 'SMS OTP dispatched or simulated successfully' })
+  async sendPhoneOtp(@Body() dto: SendPhoneOtpDto) {
+    return this.authService.sendPhoneOtp(dto);
+  }
+
+  @Public()
+  @Post('phone/otp/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify 6-digit SMS OTP. Logs in directly if purpose is LOGIN and account exists.' })
+  @ApiResponse({ status: 200, description: 'OTP verified / session authenticated' })
+  async verifyPhoneOtp(@Body() dto: VerifyPhoneOtpDto) {
+    return this.authService.verifyPhoneOtp(dto);
+  }
+
+  @Public()
+  @Post('phone/reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset account password using verified mobile phone OTP' })
+  @ApiResponse({ status: 200, description: 'Password reset successfully' })
+  async resetPasswordWithPhone(@Body() dto: ResetPasswordPhoneDto) {
+    return this.authService.resetPasswordWithPhone(dto);
   }
 }

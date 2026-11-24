@@ -28,41 +28,34 @@ export class OrgTenantGuard implements CanActivate {
     const orgIdFromParam = request.params?.organizationId as string;
     const targetOrgId = orgIdFromHeader || orgIdFromParam || user.currentOrgId;
 
-    if (!targetOrgId) {
-      // If user only belongs to 1 organization, default to it
-      const memberships = await this.prisma.organizationMember.findMany({
+    let membership = targetOrgId
+      ? await this.prisma.organizationMember.findUnique({
+          where: {
+            organizationId_userId: {
+              organizationId: targetOrgId,
+              userId: user.userId,
+            },
+          },
+          include: {
+            organization: true,
+          },
+        })
+      : null;
+
+    // If targetOrgId was invalid, stale, or user is not a member of it, check user's active memberships
+    if (!membership || membership.status !== 'ACTIVE') {
+      const userMemberships = await this.prisma.organizationMember.findMany({
         where: { userId: user.userId, status: 'ACTIVE' },
         include: { organization: true },
+        orderBy: { createdAt: 'asc' },
       });
 
-      if (memberships.length === 1) {
-        request.organizationId = memberships[0].organizationId;
-        request.memberRole = memberships[0].role;
-        request.organization = memberships[0].organization;
-        return true;
-      }
-
-      if (memberships.length === 0) {
+      if (userMemberships.length > 0) {
+        // Fall back to user's primary or first active organization
+        membership = userMemberships[0];
+      } else {
         throw new ForbiddenException('User is not associated with any active organization');
       }
-
-      throw new BadRequestException('Organization context required. Please pass x-organization-id header');
-    }
-
-    const membership = await this.prisma.organizationMember.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId: targetOrgId,
-          userId: user.userId,
-        },
-      },
-      include: {
-        organization: true,
-      },
-    });
-
-    if (!membership || membership.status !== 'ACTIVE') {
-      throw new ForbiddenException('You do not have active access to this organization');
     }
 
     request.organizationId = membership.organizationId;
